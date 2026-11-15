@@ -20,6 +20,7 @@ from .const import (
     SCHEMA_VERSION,
     THEME_MODES,
     TV_HOLD_MODES,
+    VOICE_TARGETS,
 )
 
 _ENTITY_ID_RE = re.compile(r"^(?!.+__)(?!_)[\da-z_]+(?<!_)\.(?!_)[\da-z_]+(?<!_)$")
@@ -69,6 +70,8 @@ _ACTION_SCHEMAS: dict[str, dict[Any, Any]] = {
     "event": {},
     "page": {vol.Required("page"): vol.All(str, vol.Length(min=1))},
     "app": {vol.Required("cmd"): vol.In(APP_CMDS)},
+    # ha = HA Assist through the integration's assist_satellite; tv = Google Assistant on the TV.
+    "voice": {vol.Required("target"): vol.In(VOICE_TARGETS)},
     "none": {},
 }
 

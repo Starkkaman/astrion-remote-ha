@@ -30,6 +30,16 @@ TOPIC_EVENT: Final = "event"
 TOPIC_CALL: Final = "call"
 TOPIC_CMD: Final = "cmd"
 TOPIC_TELEMETRY: Final = "telemetry"
+# Voice (HA Assist over MQTT, see "Voice" in docs/ARCHITECTURE.md).
+TOPIC_VOICE_START: Final = "voice/start"
+TOPIC_VOICE_AUDIO: Final = "voice/audio"  # + "/<run>", binary PCM16 mono 16 kHz
+TOPIC_VOICE_END: Final = "voice/end"
+TOPIC_VOICE_STOP: Final = "voice/stop"
+TOPIC_VOICE_EVENT: Final = "voice/event"
+VOICE_RATE: Final = 16000
+VOICE_TARGETS: Final = ("ha", "tv")
+# The app caps a run at 8 s; the audio stream ends by itself after this many seconds.
+VOICE_AUDIO_TIMEOUT: Final = 10.0
 
 EVENT_BUTTON: Final = "astrion_remote_button"
 

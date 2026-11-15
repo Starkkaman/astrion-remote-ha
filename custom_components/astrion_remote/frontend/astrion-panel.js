@@ -17,6 +17,12 @@ const ACTION_TYPES = [
   ["event", "Event only (use in automations)"],
   ["none", "Nothing"],
   ["app", "App command"],
+  ["voice", "Voice"],
+];
+
+const VOICE_TARGETS = [
+  ["ha", "Home Assistant Assist"],
+  ["tv", "TV Google Assistant"],
 ];
 
 const TV_HOLD_MODES = [
@@ -455,6 +461,8 @@ class AstrionRemotePanel extends HTMLElement {
         return "Nothing";
       case "app":
         return `App: ${action.cmd || ""}`;
+      case "voice":
+        return action.target === "tv" ? "Voice: TV Assistant" : "Voice: HA Assist";
       default:
         return String(action.type || "?");
     }
@@ -600,13 +608,15 @@ class AstrionRemotePanel extends HTMLElement {
    * Editor for one action. `get()` reads the current action from the model, `set(a)` writes it
    * (undefined = remove). Unknown fields of the action are preserved on field edits.
    */
-  _actionEditor(get, set, { gesture = "tap", allowUnset = true, decorated = false, hint = true } = {}) {
+  _actionEditor(get, set, { gesture = "tap", allowUnset = true, decorated = false, hint = true, voice = false } = {}) {
     const box = h("div", { class: "action" });
     const draw = () => {
       const cur = get();
       const type = isObj(cur) ? cur.type : "";
       const UNSET = "__unset__";
-      const options = [...(allowUnset ? [[UNSET, "Not set"]] : []), ...ACTION_TYPES];
+      // Voice is offered on keys only (an existing voice action elsewhere still shows).
+      const types = ACTION_TYPES.filter(([t]) => t !== "voice" || voice || type === "voice");
+      const options = [...(allowUnset ? [[UNSET, "Not set"]] : []), ...types];
       const fields = [];
       fields.push(
         this._select(options, type || (allowUnset ? UNSET : ""), (v) => {
@@ -624,6 +634,7 @@ class AstrionRemotePanel extends HTMLElement {
             } else if (v === "page") next.page = this._pages[0]?.id || "next";
             else if (v === "app") next.cmd = "settings";
             else if (v === "ha") next.action = "";
+            else if (v === "voice") next.target = "ha";
             set(next);
           }
           draw();
@@ -689,6 +700,22 @@ class AstrionRemotePanel extends HTMLElement {
         }
       } else if (type === "app") {
         fields.push(this._select(APP_CMDS, cur.cmd ?? "settings", (v) => patch({ cmd: v }), { label: "Command" }));
+      } else if (type === "voice") {
+        fields.push(this._select(VOICE_TARGETS, cur.target ?? "ha", (v) => {
+            patch({ target: v || "ha" });
+            draw();
+          }, { label: "Assistant" }));
+        if (hint) {
+          fields.push(
+            h(
+              "div",
+              { class: "hint" },
+              cur.target === "tv"
+                ? "Talks to Google Assistant on the TV while the key is held."
+                : "Runs Home Assistant Assist with the remote's microphone. Pick the assistant on the Astrion Remote device page."
+            )
+          );
+        }
       }
       box.replaceChildren(...fields);
     };
@@ -705,7 +732,7 @@ class AstrionRemotePanel extends HTMLElement {
         this._actionEditor(
           () => this._gestureTarget(keyId, ctx, false)?.[g],
           (a) => this._setGesture(keyId, ctx, g, a),
-          { gesture: g }
+          { gesture: g, voice: true }
         )
       )
     );

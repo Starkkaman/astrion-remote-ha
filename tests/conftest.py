@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.astrion_remote.const import (
@@ -19,10 +20,12 @@ BASE = "astrion/ha100"
 
 
 @pytest.fixture
-def hass(hass):
+async def hass(hass):
     """The frontend needs the hass_frontend package; mark it (and panel_custom) loaded so the
-    integration's dependencies resolve. Panel registration only writes hass.data."""
+    integration's dependencies resolve. Panel registration only writes hass.data.
+    assist_pipeline -> conversation needs the core `homeassistant` integration (exposed entities)."""
     hass.config.components.update({"frontend", "panel_custom"})
+    assert await async_setup_component(hass, "homeassistant", {})
     return hass
 
 

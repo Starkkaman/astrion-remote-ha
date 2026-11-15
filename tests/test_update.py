@@ -82,7 +82,7 @@ async def _install_url(hass, mqtt_mock) -> str:
 
 async def test_base_url_migrated_to_default(hass, mqtt_mock, config_entry, apk_setup):
     """An entry without base_url (0.1.0) is migrated to the default option."""
-    assert config_entry.minor_version == 2
+    assert config_entry.minor_version == 3
     assert config_entry.options[CONF_BASE_URL] == DEFAULT_BASE_URL == "http://192.168.5.166:8123"
 
 

@@ -17,6 +17,10 @@ def _tv(key: str, hold: str = "passthrough") -> dict[str, Any]:
     return {"type": "tv_key", "key": key, "hold": hold}
 
 
+def _voice(target: str) -> dict[str, Any]:
+    return {"type": "voice", "target": target}
+
+
 def _cycle(entity: str) -> dict[str, Any]:
     domain = entity.split(".", 1)[0]
     return _ha(f"{domain}.select_next", entity, {"cycle": True})
@@ -35,6 +39,13 @@ def _launch(app: str) -> dict[str, Any]:
 
 
 _NONE = {"type": "none"}
+
+# Voice key mappings shipped before 0.3.0 (tv SEARCH on tap). Entries whose voice key is still
+# exactly this are moved to the new default on migration; anything else is the user's choice.
+OLD_VOICE_DEFAULTS: tuple[dict[str, Any], ...] = (
+    {"tap": _tv("SEARCH", "none")},
+    {"tap": {"type": "tv_key", "key": "SEARCH"}},
+)
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "schema_version": 1,
@@ -69,7 +80,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "blue": {"tap": _cycle("select.hisense_tv_picture_mode")},
         "home": {"tap": {"type": "page", "page": "now"}, "double": _tv("HOME", "none")},
         "power": {"tap": {"type": "event"}},
-        "voice": {"tap": _tv("SEARCH", "none")},
+        "voice": {"tap": _voice("ha"), "hold": _voice("tv")},
         "sc1": {"tap": dict(_NONE)},
         "sc2": {"tap": dict(_NONE)},
         "sc3": {"tap": dict(_NONE)},

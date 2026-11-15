@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, Protocol
 
 import voluptuous as vol
 
@@ -41,6 +41,12 @@ from .const import (
     TOPIC_STATE,
     TOPIC_STATUS,
     TOPIC_TELEMETRY,
+    TOPIC_VOICE_AUDIO,
+    TOPIC_VOICE_END,
+    TOPIC_VOICE_EVENT,
+    TOPIC_VOICE_START,
+    TOPIC_VOICE_STOP,
+    VOICE_RATE,
 )
 from .default_config import DEFAULT_CONFIG
 from .schema import (
@@ -72,6 +78,28 @@ _TELEMETRY_ALIASES = {
     "last_key": "last_key",
     "ts": "ts",
 }
+
+
+_RUN_ID_MAX = 64
+
+
+class VoiceSink(Protocol):
+    """What the hub hands voice messages to (the assist_satellite entity)."""
+
+    def voice_start(self, run: str, rate: int) -> None:
+        """A new run started; cancels any previous one."""
+
+    def voice_audio(self, run: str, chunk: bytes) -> None:
+        """One PCM16 chunk of a run."""
+
+    def voice_end(self, run: str) -> None:
+        """The app stopped sending audio for a run."""
+
+
+def _run_id(value: Any) -> str | None:
+    if isinstance(value, str) and 0 < len(value) <= _RUN_ID_MAX and "/" not in value:
+        return value
+    return None
 
 
 def _as_bool(value: Any) -> bool | None:
@@ -107,6 +135,7 @@ class AstrionHub:
         self._last_sent: dict[str, float] = {}
         self._last_payload: dict[str, str] = {}
         self._pending: dict[str, CALLBACK_TYPE] = {}
+        self.satellite: VoiceSink | None = None  # set by the assist_satellite entity
         self._store: Store[dict[str, Any]] = Store(hass, STORE_VERSION, f"{DOMAIN}.{entry.entry_id}")
 
     # ---- helpers -------------------------------------------------------------------------
@@ -163,6 +192,15 @@ class AstrionHub:
             await mqtt.async_subscribe(self.hass, self.topic(TOPIC_TELEMETRY), self._on_telemetry)
         )
         self._unsubs.append(await mqtt.async_subscribe(self.hass, self.topic(TOPIC_STATUS), self._on_status))
+        self._unsubs.append(
+            await mqtt.async_subscribe(self.hass, self.topic(TOPIC_VOICE_START), self._on_voice_start)
+        )
+        self._unsubs.append(
+            await mqtt.async_subscribe(
+                self.hass, self.topic(f"{TOPIC_VOICE_AUDIO}/+"), self._on_voice_audio, encoding=None
+            )
+        )
+        self._unsubs.append(await mqtt.async_subscribe(self.hass, self.topic(TOPIC_VOICE_END), self._on_voice_end))
 
         await self.async_apply_options()
 
@@ -213,6 +251,32 @@ class AstrionHub:
     async def async_send_cmd(self, cmd: str) -> None:
         """Publish a command to <base>/cmd (not retained)."""
         await mqtt.async_publish(self.hass, self.topic(TOPIC_CMD), cmd, qos=1, retain=False)
+
+    @callback
+    def voice_publish(self, sub: str, data: dict[str, Any]) -> None:
+        """Publish a voice message (voice/event or voice/stop); never retained."""
+        self.hass.async_create_task(
+            mqtt.async_publish(
+                self.hass,
+                self.topic(sub),
+                json.dumps(data, separators=(",", ":"), ensure_ascii=False),
+                qos=1,
+                retain=False,
+            ),
+            eager_start=True,
+        )
+
+    @callback
+    def voice_event(self, run: str, stage: str, **fields: Any) -> None:
+        """Publish <base>/voice/event for a run (None fields are left out)."""
+        data: dict[str, Any] = {"run": run, "stage": stage}
+        data.update({k: v for k, v in fields.items() if v is not None})
+        self.voice_publish(TOPIC_VOICE_EVENT, data)
+
+    @callback
+    def voice_stop(self, run: str) -> None:
+        """Ask the app to stop recording a run (<base>/voice/stop)."""
+        self.voice_publish(TOPIC_VOICE_STOP, {"run": run})
 
     # ---- state mirror --------------------------------------------------------------------
     async def _async_sync_mirror(self) -> None:
@@ -398,3 +462,35 @@ class AstrionHub:
             return
         async_dispatcher_send(self.hass, self.signal)
 
+    # ---- voice ---------------------------------------------------------------------------
+    @callback
+    def _on_voice_start(self, msg: mqtt.ReceiveMessage) -> None:
+        data = self._json(msg)
+        run = _run_id(data.get("run")) if data else None
+        if data is None or run is None:
+            _LOGGER.debug("Astrion %s: ignoring malformed voice/start %s", self.remote_id, msg.payload)
+            return
+        rate = data.get("rate", VOICE_RATE)
+        if rate != VOICE_RATE:
+            self.voice_event(run, "error", error=f"unsupported sample rate {rate}")
+            return
+        if self.satellite is None:
+            self.voice_event(run, "error", error="Assist satellite is not available")
+            return
+        self.satellite.voice_start(run, rate)
+
+    @callback
+    def _on_voice_audio(self, msg: mqtt.ReceiveMessage) -> None:
+        run = _run_id(msg.topic.rsplit("/", 1)[-1])
+        payload = msg.payload
+        if run is None or self.satellite is None or not isinstance(payload, (bytes, bytearray)) or not payload:
+            return
+        self.satellite.voice_audio(run, bytes(payload))
+
+    @callback
+    def _on_voice_end(self, msg: mqtt.ReceiveMessage) -> None:
+        data = self._json(msg)
+        run = _run_id(data.get("run")) if data else None
+        if run is None or self.satellite is None:
+            return
+        self.satellite.voice_end(run)

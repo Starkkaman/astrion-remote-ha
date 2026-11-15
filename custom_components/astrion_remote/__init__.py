@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import logging
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.components import mqtt
@@ -22,19 +24,28 @@ from homeassistant.loader import async_get_integration
 from .apk import ApkDownloadView, ApkTokens
 from .const import (
     CONF_BASE_URL,
+    CONF_CONFIG,
     DEFAULT_BASE_URL,
     DOMAIN,
     SERVICE_PAGE,
     SERVICE_RELOAD,
     SERVICE_TOAST,
 )
+from .default_config import DEFAULT_CONFIG, OLD_VOICE_DEFAULTS
 from .hub import AstrionHub
 from .panel import async_register_panel, async_register_static, async_remove_panel
 from .websocket import async_register as async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR, Platform.UPDATE]
+PLATFORMS = [
+    Platform.ASSIST_SATELLITE,
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.UPDATE,
+]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -96,14 +107,38 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+def migrate_voice_key(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a copy of `config` with the new voice key default, or None to leave it alone.
+
+    Only a voice key that is still exactly the pre-0.3.0 default (tv SEARCH on tap, nothing
+    else) is replaced; any other mapping is the user's and is kept.
+    """
+    keys = config.get("keys")
+    if not isinstance(keys, dict) or keys.get("voice") not in OLD_VOICE_DEFAULTS:
+        return None
+    out = copy.deepcopy(config)
+    out["keys"]["voice"] = copy.deepcopy(DEFAULT_CONFIG["keys"]["voice"])
+    return out
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: AstrionConfigEntry) -> bool:
-    """1.1 -> 1.2: add the base_url option (HA URL reachable from the remote)."""
+    """1.1 -> 1.2: add the base_url option (HA URL reachable from the remote).
+
+    1.2 -> 1.3: voice key tap/hold -> voice ha/tv, if it is still the old default.
+    """
     if entry.version > 1:
         return False
     if entry.version == 1 and entry.minor_version < 2:
         options = dict(entry.options)
         options.setdefault(CONF_BASE_URL, DEFAULT_BASE_URL)
         hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
+    if entry.version == 1 and entry.minor_version < 3:
+        options = dict(entry.options)
+        if isinstance(config := options.get(CONF_CONFIG), dict) and (
+            migrated := migrate_voice_key(config)
+        ) is not None:
+            options[CONF_CONFIG] = migrated
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=3)
     return True
 
 

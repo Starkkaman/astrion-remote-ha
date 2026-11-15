@@ -22,6 +22,11 @@ Python 3.14). Requires the core **MQTT** integration.
 | `call` | app → HA | no | executed only if allowlisted; refusals are logged at WARNING; no reply |
 | `cmd` | HA → app | no | `reload`, `page <id>`, `toast <text>`, `update <url> <sha256>` |
 | `telemetry` | app → HA | yes | sensors (see below) |
+| `voice/start` | app → HA | no | `{"run","rate":16000}`: starts an Assist run on `assist_satellite.astrion_remote` (a new run cancels the old one) |
+| `voice/audio/<run>` | app → HA | no | binary PCM16 mono 16 kHz chunks; unknown/finished runs ignored |
+| `voice/end` | app → HA | no | `{"run","reason"}`: end of audio (HA also ends it 10 s after start) |
+| `voice/stop` | HA → app | no | `{"run"}`: HA stopped listening (VAD end) |
+| `voice/event` | HA → app | no | `{"run","stage":"listening/processing/responding/done/error","text"?,"tts_url"?,"error"?}` |
 
 Telemetry JSON (partial updates merge): `{"battery":87,"charging":true,"screen":true,"page":"now","app_version":"0.3.1","wifi_rssi":-61,"last_key":"red","ts":...}`.
 Accepted aliases: `battery_level`, `version`, `rssi`, `screen_on`; booleans may be `true/false`, `on/off`, `1/0`.
@@ -60,6 +65,13 @@ in `/config/astrion_remote/` (or the configured sub directory). Install verifies
 `<base_url>/api/astrion_remote/apk/<32-byte token>` (one download, 10 minutes) and publishes `update <url> <sha256>`.
 `base_url` is the *Home Assistant URL reachable from the remote* option (Timings & theme; `http(s)://host[:port]`, no
 path). Leave it empty to fall back to Home Assistant's internal URL (Settings → System → Network).
+
+## Voice
+The `voice` action (`{"type":"voice","target":"ha"|"tv"}`; default: voice key tap = `ha`, hold = `tv`). For `ha` the
+remote streams its mic over MQTT to the **Assist satellite** "Astrion Remote"; pick the pipeline with the device's
+"Assistant" select (or Settings → Voice assistants). `tts_url` is `base_url` (option) + HA's `/api/tts_proxy/<token>`,
+requested as mp3. Upgrading from 0.2.x moves the voice key to the new default only if it was still the old default
+(TV `SEARCH` on tap).
 
 ## Services
 `astrion_remote.toast` (`text`), `astrion_remote.page` (`id`), `astrion_remote.reload`; optional `device_id` to target one remote.
