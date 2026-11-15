@@ -1,0 +1,298 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Astrion Remote",
+        "description": "Add one Astrion remote. It talks to Home Assistant only over MQTT.",
+        "data": {
+          "device_id": "Device id",
+          "base_topic": "Base topic"
+        },
+        "data_description": {
+          "device_id": "Id of the remote, as configured in the app (for example ha100).",
+          "base_topic": "MQTT base topic of the remote (for example astrion/ha100)."
+        }
+      }
+    },
+    "error": {
+      "invalid_device_id": "Use lowercase letters, digits, _ or - only.",
+      "invalid_topic": "Invalid topic: no wildcards (+ #), no leading slash, no empty levels."
+    },
+    "abort": {
+      "already_configured": "This remote is already configured.",
+      "mqtt_not_configured": "Set up the MQTT integration first."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Astrion Remote",
+        "menu_options": {
+          "keys": "Keys",
+          "pages": "Pages",
+          "timings": "Timings & theme",
+          "yaml": "Import/export full config (YAML)"
+        }
+      },
+      "keys": {
+        "title": "Keys",
+        "description": "Pick a key, a gesture and what it should do. Every press also fires the astrion_remote_button event.",
+        "data": {
+          "key": "Key",
+          "gesture": "Gesture",
+          "action_type": "Action type"
+        }
+      },
+      "key_ha": {
+        "title": "Home Assistant action",
+        "description": "Action for {key} ({gesture}). Target entities only; the allowlist is updated automatically. {error}",
+        "data": {
+          "action": "Action",
+          "repeat": "Repeat while held"
+        }
+      },
+      "key_tv_key": {
+        "title": "TV key",
+        "description": "TV key for {key} ({gesture}), sent straight to Control Freak.",
+        "data": {
+          "tv_key": "Key name (e.g. DPAD_CENTER)",
+          "hold": "When held"
+        }
+      },
+      "key_page": {
+        "title": "Page",
+        "description": "Page for {key} ({gesture}).",
+        "data": {
+          "page": "Page"
+        }
+      },
+      "key_app": {
+        "title": "App command",
+        "description": "Local app command for {key} ({gesture}).",
+        "data": {
+          "cmd": "Command"
+        }
+      },
+      "pages": {
+        "title": "Pages",
+        "description": "Edit the pages (YAML list). {error}",
+        "data": {
+          "pages": "Pages"
+        }
+      },
+      "timings": {
+        "title": "Timings & theme",
+        "data": {
+          "hold_ms": "Hold threshold",
+          "double_ms": "Double-tap window",
+          "keepalive_ms": "Hold repeat interval",
+          "theme_mode": "Theme",
+          "calm": "Calm mode",
+          "keytopic": "TV key topic",
+          "context_entity": "TV context entity",
+          "apk_dir": "APK sub directory"
+        },
+        "data_description": {
+          "apk_dir": "Folder under /config/astrion_remote/ holding astrion-<version>.apk and its .sha256. Empty = that folder itself.",
+          "context_entity": "Entity whose state picks key contexts (current TV app)."
+        }
+      },
+      "yaml": {
+        "title": "Import/export",
+        "description": "Copy the full config, or paste a new one and submit. The allowlist is always recomputed. {error}",
+        "data": {
+          "config": "Config (YAML)"
+        }
+      }
+    },
+    "error": {
+      "invalid_action": "Invalid action.",
+      "invalid_pages": "The pages do not match the schema.",
+      "invalid_yaml": "Not valid YAML.",
+      "invalid_config": "The config does not match the schema.",
+      "invalid_apk_dir": "Use a relative folder without '..'.",
+      "invalid_timings": "Invalid values."
+    }
+  },
+  "selector": {
+    "key": {
+      "options": {
+        "back": "Back",
+        "home": "Home",
+        "power": "Power (F2)",
+        "voice": "Voice",
+        "sc1": "Shortcut 1",
+        "sc2": "Shortcut 2",
+        "sc3": "Shortcut 3",
+        "sc4": "Shortcut 4",
+        "red": "Red",
+        "green": "Green",
+        "yellow": "Yellow",
+        "blue": "Blue",
+        "up": "Up",
+        "down": "Down",
+        "left": "Left",
+        "right": "Right",
+        "ok": "OK",
+        "menu": "Menu",
+        "page_up": "Page up",
+        "page_down": "Page down",
+        "vol_up": "Volume up",
+        "vol_down": "Volume down",
+        "mute": "Mute"
+      }
+    },
+    "gesture": {
+      "options": {
+        "tap": "Tap",
+        "double": "Double tap",
+        "hold": "Hold"
+      }
+    },
+    "action_type": {
+      "options": {
+        "tv_key": "TV key",
+        "ha": "Home Assistant action",
+        "event": "Event only (automations)",
+        "page": "Page",
+        "app": "App command",
+        "none": "Nothing"
+      }
+    },
+    "tv_hold": {
+      "options": {
+        "passthrough": "Pass through (down/up)",
+        "repeat": "Repeat",
+        "none": "Ignore"
+      }
+    },
+    "app_cmd": {
+      "options": {
+        "settings": "Settings",
+        "reload": "Reload"
+      }
+    },
+    "theme_mode": {
+      "options": {
+        "auto": "Auto",
+        "day": "Day",
+        "night": "Night"
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "tap": "\"{subtype}\" pressed",
+      "double": "\"{subtype}\" double-pressed",
+      "hold": "\"{subtype}\" held"
+    },
+    "trigger_subtype": {
+      "back": "Back",
+      "home": "Home",
+      "power": "Power (F2)",
+      "voice": "Voice",
+      "sc1": "Shortcut 1",
+      "sc2": "Shortcut 2",
+      "sc3": "Shortcut 3",
+      "sc4": "Shortcut 4",
+      "red": "Red",
+      "green": "Green",
+      "yellow": "Yellow",
+      "blue": "Blue",
+      "up": "Up",
+      "down": "Down",
+      "left": "Left",
+      "right": "Right",
+      "ok": "OK",
+      "menu": "Menu",
+      "page_up": "Page up",
+      "page_down": "Page down",
+      "vol_up": "Volume up",
+      "vol_down": "Volume down",
+      "mute": "Mute"
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "charging": {
+        "name": "Charging"
+      },
+      "screen": {
+        "name": "Screen"
+      },
+      "connectivity": {
+        "name": "Connected"
+      }
+    },
+    "button": {
+      "reload_config": {
+        "name": "Reload config"
+      },
+      "home_page": {
+        "name": "Go to home page"
+      }
+    },
+    "sensor": {
+      "battery": {
+        "name": "Battery"
+      },
+      "page": {
+        "name": "Page"
+      },
+      "app_version": {
+        "name": "App version"
+      },
+      "wifi_rssi": {
+        "name": "Wi-Fi signal"
+      },
+      "last_key": {
+        "name": "Last key"
+      }
+    },
+    "update": {
+      "app": {
+        "name": "App"
+      }
+    }
+  },
+  "services": {
+    "toast": {
+      "name": "Show toast",
+      "description": "Show a short message on the remote.",
+      "fields": {
+        "text": {
+          "name": "Text",
+          "description": "Message to show."
+        },
+        "device_id": {
+          "name": "Remote",
+          "description": "Remote(s) to target. Leave empty for all."
+        }
+      }
+    },
+    "page": {
+      "name": "Show page",
+      "description": "Switch the remote to a page.",
+      "fields": {
+        "id": {
+          "name": "Page id",
+          "description": "Page id from the config (or next/prev)."
+        },
+        "device_id": {
+          "name": "Remote",
+          "description": "Remote(s) to target. Leave empty for all."
+        }
+      }
+    },
+    "reload": {
+      "name": "Reload",
+      "description": "Re-publish the config and tell the remote to reload it.",
+      "fields": {
+        "device_id": {
+          "name": "Remote",
+          "description": "Remote(s) to target. Leave empty for all."
+        }
+      }
+    }
+  }
+}

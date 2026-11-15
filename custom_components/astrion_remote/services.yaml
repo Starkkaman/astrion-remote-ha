@@ -1,0 +1,37 @@
+toast:
+  fields:
+    text:
+      required: true
+      example: "Dinner is ready"
+      selector:
+        text:
+    device_id:
+      required: false
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: astrion_remote
+page:
+  fields:
+    id:
+      required: true
+      example: "now"
+      selector:
+        text:
+    device_id:
+      required: false
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: astrion_remote
+reload:
+  fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: astrion_remote

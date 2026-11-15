@@ -1,0 +1,13 @@
+{
+  "domain": "astrion_remote",
+  "name": "Astrion Remote",
+  "codeowners": ["@Starkkaman"],
+  "config_flow": true,
+  "dependencies": ["http", "mqtt"],
+  "documentation": "https://github.com/Starkkaman/astrion-remote-ha",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Starkkaman/astrion-remote-ha/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

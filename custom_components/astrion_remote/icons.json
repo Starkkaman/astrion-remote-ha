@@ -1,0 +1,21 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "screen": {"default": "mdi:monitor-off", "state": {"on": "mdi:monitor"}}
+    },
+    "button": {
+      "reload_config": {"default": "mdi:reload"},
+      "home_page": {"default": "mdi:home"}
+    },
+    "sensor": {
+      "page": {"default": "mdi:book-open-page-variant"},
+      "app_version": {"default": "mdi:tag"},
+      "last_key": {"default": "mdi:gesture-tap-button"}
+    }
+  },
+  "services": {
+    "toast": {"service": "mdi:message-text"},
+    "page": {"service": "mdi:book-open-page-variant"},
+    "reload": {"service": "mdi:reload"}
+  }
+}
