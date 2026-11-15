@@ -33,7 +33,20 @@ Computed on every publish, never stored:
   (all natural services of the domain), `rocker`/`switch` (`turn_on`/`turn_off`/`toggle`).
 `ha` actions may only target `entity_id`s (no area/device/label). `data.entity_id` is treated as a target.
 
+## Editor panel (sidebar "Astrion Remote", admins only)
+- **Buttons**: the remote drawn as a grid of key chips (top row, voice, D-pad, menu, page, volume, colour keys,
+  shortcut keys), each showing its tap action. Click a chip to set Tap / Double tap / Hold (TV key, Home Assistant
+  action, go to page, event only, nothing, app command) and per-app overrides for values of `tv.context_entity`.
+- **Pages**: add, rename, reorder and delete pages; add/reorder/delete sections and edit them per type.
+- **YAML**: the whole config for import/export.
+- Changes are validated live; **Save** validates, stores in the entry options and republishes (same path as the
+  options flow). The panel works even while MQTT is down; the config is published once the remote is set up.
+- Websocket API (admin): `astrion_remote/config/get`, `astrion_remote/config/validate`, `astrion_remote/config/set`
+  (`entry_id`, `config`) and `astrion_remote/tv_keys`.
+
 ## Options (Configure)
+The options flow stays available as a fallback editor.
+
 - **Keys**: key → gesture (tap/double/hold) → action type; `ha` uses the action selector (hold: optional *repeat*).
 - **Pages**: YAML editor, validated against the section schema.
 - **Timings & theme**: hold/double/keepalive ms, theme, calm, TV key topic, context entity, APK sub directory,

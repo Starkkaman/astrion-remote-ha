@@ -5,18 +5,32 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.exceptions import (
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .apk import ApkDownloadView, ApkTokens
-from .const import CONF_BASE_URL, DEFAULT_BASE_URL, DOMAIN, SERVICE_PAGE, SERVICE_RELOAD, SERVICE_TOAST
+from .const import (
+    CONF_BASE_URL,
+    DEFAULT_BASE_URL,
+    DOMAIN,
+    SERVICE_PAGE,
+    SERVICE_RELOAD,
+    SERVICE_TOAST,
+)
 from .hub import AstrionHub
+from .panel import async_register_panel, async_register_static, async_remove_panel
+from .websocket import async_register as async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,10 +65,15 @@ def _hubs_for_call(hass: HomeAssistant, call: ServiceCall) -> list[AstrionHub]:
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register services and the APK download view."""
+    """Register services, the APK download view, the panel's websocket API and static files."""
     tokens = ApkTokens()
-    hass.data[DOMAIN] = {"tokens": tokens}
+    integration = await async_get_integration(hass, DOMAIN)
+    hass.data[DOMAIN] = {"tokens": tokens, "version": str(integration.version or "0")}
     hass.http.register_view(ApkDownloadView(tokens))
+    async_register_websocket(hass)
+    await async_register_static(hass)
+    # The editor stays usable while MQTT is down (saves go to the options and publish on setup).
+    await async_register_panel(hass, hass.data[DOMAIN]["version"])
 
     async def toast(call: ServiceCall) -> None:
         text = " ".join(call.data["text"].split())  # one line on the wire
@@ -103,6 +122,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AstrionConfigEntry) -> b
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Re-adds the panel if the last remote was deleted and a new one added in the same run.
+    await async_register_panel(hass, hass.data[DOMAIN]["version"])
     return True
 
 
@@ -120,7 +141,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: AstrionConfigEntry) -> 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: AstrionConfigEntry) -> None:
-    """Entry deleted: clear the retained config and mirrored states (best effort)."""
+    """Entry deleted: drop the panel with the last remote; clear retained topics (best effort)."""
+    if not [e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id]:
+        async_remove_panel(hass)
     if not mqtt.mqtt_config_entry_enabled(hass):
         return
     hub = AstrionHub(hass, entry)

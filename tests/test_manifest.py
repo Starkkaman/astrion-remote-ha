@@ -35,7 +35,7 @@ async def test_manifest_loads(hass):
     """HA's loader accepts the manifest."""
     integration = await async_get_integration(hass, DOMAIN)
     assert integration.config_flow
-    assert integration.dependencies == ["http", "mqtt"]
+    assert integration.dependencies == ["frontend", "http", "mqtt", "panel_custom"]
 
 
 def test_translations_match_strings():

@@ -59,6 +59,92 @@ KEY_IDS: Final = (
     "mute",
 )
 GESTURES: Final = ("tap", "double", "hold")
+# Human labels and physical groups (top to bottom on the remote) for the panel.
+KEY_LABELS: Final = {
+    "back": "Back",
+    "home": "Home",
+    "power": "Power",
+    "voice": "Voice",
+    "sc1": "Lightbulb",
+    "sc2": "Curtains",
+    "sc3": "Music",
+    "sc4": "Climate",
+    "red": "Red",
+    "green": "Green",
+    "yellow": "Yellow",
+    "blue": "Blue",
+    "up": "Up",
+    "down": "Down",
+    "left": "Left",
+    "right": "Right",
+    "ok": "OK",
+    "menu": "Menu",
+    "page_up": "Page +",
+    "page_down": "Page -",
+    "vol_up": "Vol +",
+    "vol_down": "Vol -",
+    "mute": "Mute",
+}
+KEY_GROUPS: Final = {
+    "back": "top",
+    "home": "top",
+    "power": "top",
+    "voice": "voice",
+    "up": "dpad",
+    "down": "dpad",
+    "left": "dpad",
+    "right": "dpad",
+    "ok": "dpad",
+    "menu": "menu",
+    "page_up": "page",
+    "page_down": "page",
+    "vol_up": "volume",
+    "vol_down": "volume",
+    "mute": "volume",
+    "red": "color",
+    "green": "color",
+    "blue": "color",
+    "yellow": "color",
+    "sc1": "shortcut",
+    "sc2": "shortcut",
+    "sc3": "shortcut",
+    "sc4": "shortcut",
+}
+
+# TV key names offered by the panel's key picker (free text is accepted too).
+TV_KEYS: Final = (
+    "DPAD_UP",
+    "DPAD_DOWN",
+    "DPAD_LEFT",
+    "DPAD_RIGHT",
+    "DPAD_CENTER",
+    "BACK",
+    "HOME",
+    "MENU",
+    "SEARCH",
+    "MEDIA_PLAY_PAUSE",
+    "MEDIA_REWIND",
+    "MEDIA_FAST_FORWARD",
+    "MEDIA_NEXT",
+    "MEDIA_PREVIOUS",
+    "CHANNEL_UP",
+    "CHANNEL_DOWN",
+    "CAPTIONS",
+    "MEDIA_AUDIO_TRACK",
+    "VOLUME_UP",
+    "VOLUME_DOWN",
+    "MUTE",
+    "SETTINGS",
+    "INFO",
+)
+
+# Sidebar panel.
+PANEL_URL_PATH: Final = "astrion-remote"
+PANEL_TITLE: Final = "Astrion Remote"
+PANEL_ICON: Final = "mdi:remote-tv"
+PANEL_COMPONENT: Final = "astrion-remote-panel"
+PANEL_STATIC_URL: Final = "/astrion_remote_static"
+PANEL_JS: Final = "astrion-panel.js"
 EVENT_GESTURES: Final = ("tap", "double", "hold", "hold_end")
 
 ACTION_TYPES: Final = ("tv_key", "ha", "event", "page", "app", "none")

@@ -3,7 +3,7 @@
   "name": "Astrion Remote",
   "codeowners": ["@Starkkaman"],
   "config_flow": true,
-  "dependencies": ["http", "mqtt"],
+  "dependencies": ["frontend", "http", "mqtt", "panel_custom"],
   "documentation": "https://github.com/Starkkaman/astrion-remote-ha",
   "integration_type": "device",
   "iot_class": "local_push",

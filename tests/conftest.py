@@ -18,6 +18,14 @@ from custom_components.astrion_remote.schema import validate_config
 BASE = "astrion/ha100"
 
 
+@pytest.fixture
+def hass(hass):
+    """The frontend needs the hass_frontend package; mark it (and panel_custom) loaded so the
+    integration's dependencies resolve. Panel registration only writes hass.data."""
+    hass.config.components.update({"frontend", "panel_custom"})
+    return hass
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations in every test."""
