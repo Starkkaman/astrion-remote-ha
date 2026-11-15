@@ -15,7 +15,7 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
 from .apk import ApkDownloadView, ApkTokens
-from .const import DOMAIN, SERVICE_PAGE, SERVICE_RELOAD, SERVICE_TOAST
+from .const import CONF_BASE_URL, DEFAULT_BASE_URL, DOMAIN, SERVICE_PAGE, SERVICE_RELOAD, SERVICE_TOAST
 from .hub import AstrionHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +74,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.services.async_register(DOMAIN, SERVICE_TOAST, toast, schema=TOAST_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_PAGE, page, schema=PAGE_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, reload, schema=RELOAD_SCHEMA)
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: AstrionConfigEntry) -> bool:
+    """1.1 -> 1.2: add the base_url option (HA URL reachable from the remote)."""
+    if entry.version > 1:
+        return False
+    if entry.version == 1 and entry.minor_version < 2:
+        options = dict(entry.options)
+        options.setdefault(CONF_BASE_URL, DEFAULT_BASE_URL)
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=2)
     return True
 
 

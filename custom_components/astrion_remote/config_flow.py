@@ -14,15 +14,17 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.core import callback
 from homeassistant.helpers import selector as sel
 
-from .apk import validate_subdir
+from .apk import validate_base_url, validate_subdir
 from .const import (
     ACTION_TYPES,
     APP_CMDS,
     CONF_APK_DIR,
+    CONF_BASE_URL,
     CONF_BASE_TOPIC,
     CONF_CONFIG,
     CONF_DEVICE_ID,
     DEFAULT_BASE_TOPIC,
+    DEFAULT_BASE_URL,
     DEFAULT_DEVICE_ID,
     DOMAIN,
     GESTURES,
@@ -51,6 +53,7 @@ class AstrionConfigFlow(ConfigFlow, domain=DOMAIN):
     """One entry per remote."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Ask for the device id and base topic."""
@@ -71,7 +74,11 @@ class AstrionConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=f"Astrion Remote ({device_id})",
                     data={CONF_DEVICE_ID: device_id, CONF_BASE_TOPIC: base},
-                    options={CONF_CONFIG: validate_config(DEFAULT_CONFIG), CONF_APK_DIR: ""},
+                    options={
+                        CONF_CONFIG: validate_config(DEFAULT_CONFIG),
+                        CONF_APK_DIR: "",
+                        CONF_BASE_URL: DEFAULT_BASE_URL,
+                    },
                 )
         schema = vol.Schema(
             {
@@ -252,7 +259,7 @@ class AstrionOptionsFlow(OptionsFlow):
 
     # ---- timings & theme ---------------------------------------------------------------------
     async def async_step_timings(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Timings, theme, TV and APK directory."""
+        """Timings, theme, TV, APK directory and the HA URL for APK downloads."""
         errors: dict[str, str] = {}
         config = self._config
         if user_input is not None:
@@ -265,9 +272,13 @@ class AstrionOptionsFlow(OptionsFlow):
                 apk_dir = validate_subdir(user_input.get(CONF_APK_DIR, ""))
             except ValueError:
                 errors[CONF_APK_DIR] = "invalid_apk_dir"
-            else:
+            try:
+                base_url = validate_base_url(user_input.get(CONF_BASE_URL, ""))
+            except ValueError:
+                errors[CONF_BASE_URL] = "invalid_base_url"
+            if not errors:
                 try:
-                    return self._save(config, **{CONF_APK_DIR: apk_dir})
+                    return self._save(config, **{CONF_APK_DIR: apk_dir, CONF_BASE_URL: base_url})
                 except vol.Invalid:
                     errors["base"] = "invalid_timings"
         timings = config.get("timings", {})
@@ -299,6 +310,14 @@ class AstrionOptionsFlow(OptionsFlow):
             fields[vol.Optional("context_entity")] = sel.EntitySelector()
         fields[vol.Optional(CONF_APK_DIR, default=self.config_entry.options.get(CONF_APK_DIR, ""))] = (
             sel.TextSelector()
+        )
+        base_url = (
+            user_input.get(CONF_BASE_URL, "")
+            if user_input is not None
+            else self.config_entry.options.get(CONF_BASE_URL, DEFAULT_BASE_URL)
+        )
+        fields[vol.Optional(CONF_BASE_URL, description={"suggested_value": base_url})] = sel.TextSelector(
+            sel.TextSelectorConfig(type=sel.TextSelectorType.URL)
         )
         return self.async_show_form(step_id="timings", data_schema=vol.Schema(fields), errors=errors)
 

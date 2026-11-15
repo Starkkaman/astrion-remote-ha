@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import secrets
 import time
+from urllib.parse import urlsplit
 
 from aiohttp import web
 from awesomeversion import AwesomeVersion
@@ -53,6 +54,33 @@ def validate_subdir(value: str) -> str:
     value = (value or "").strip().strip("/")
     if value.startswith("~") or ".." in Path(value).parts or Path(value).is_absolute():
         raise ValueError("invalid sub directory")
+    return value
+
+
+def validate_base_url(value: str) -> str:
+    """Validate the HA base URL from the options flow: http(s)://host[:port], no path.
+
+    Returns the normalized URL ("" means: fall back to HA's own URL).
+    """
+    value = (value or "").strip().rstrip("/")
+    if not value:
+        return ""
+    try:
+        parts = urlsplit(value)
+        parts.port  # noqa: B018 - raises ValueError on a bad port
+    except ValueError as err:
+        raise ValueError("invalid URL") from err
+    if (
+        parts.scheme not in ("http", "https")
+        or not parts.hostname
+        or parts.path
+        or parts.query
+        or parts.fragment
+        or parts.username
+        or parts.password
+        or any(c.isspace() for c in value)
+    ):
+        raise ValueError("invalid URL")
     return value
 
 

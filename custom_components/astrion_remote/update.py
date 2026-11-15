@@ -72,10 +72,14 @@ class AstrionUpdate(AstrionEntity, UpdateEntity):
         actual = await self.hass.async_add_executor_job(file_sha256, release.path)
         if actual != release.sha256:
             raise HomeAssistantError(f"{release.path.name} does not match its .sha256 sidecar")
-        try:
-            base_url = get_url(self.hass, prefer_external=False, allow_cloud=False)
-        except NoURLAvailableError as err:
-            raise HomeAssistantError("Set an internal URL in Home Assistant network settings") from err
+        base_url = self.hub.base_url
+        if not base_url:
+            try:
+                base_url = get_url(self.hass, prefer_external=False, allow_cloud=False)
+            except NoURLAvailableError as err:
+                raise HomeAssistantError(
+                    "Set the Home Assistant URL in the Astrion options (Timings & theme)"
+                ) from err
         tokens: ApkTokens = self.hass.data[DOMAIN]["tokens"]
         token = tokens.issue(release.path)
         url = base_url + APK_VIEW_URL.format(token=token)

@@ -11,9 +11,11 @@ import pytest
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core_config import async_process_ha_core_config
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.common import async_fire_mqtt_message
+from homeassistant.helpers.network import NoURLAvailableError
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_mqtt_message
 
-from custom_components.astrion_remote.apk import ApkTokens
+from custom_components.astrion_remote.apk import ApkTokens, validate_base_url
+from custom_components.astrion_remote.const import CONF_BASE_URL, DEFAULT_BASE_URL
 
 from .conftest import BASE
 
@@ -29,6 +31,27 @@ def _write_apk(directory: Path, version: str, content: bytes, sidecar: str | Non
         (sidecar if sidecar is not None else digest) + f"  {apk.name}\n"
     )
     return digest
+
+
+@pytest.fixture
+def base_url_option() -> str | None:
+    """base_url option on the entry; None = key missing (pre-0.1.1 entry, migrated)."""
+    return None
+
+
+@pytest.fixture
+def config_entry(config_entry, base_url_option):
+    """The shared entry, with base_url set when the test asks for it."""
+    if base_url_option is None:
+        return config_entry
+    return MockConfigEntry(
+        domain=config_entry.domain,
+        title=config_entry.title,
+        unique_id=config_entry.unique_id,
+        data=dict(config_entry.data),
+        options={**config_entry.options, CONF_BASE_URL: base_url_option},
+        minor_version=2,
+    )
 
 
 @pytest.fixture
@@ -49,8 +72,78 @@ async def apk_setup(hass, mqtt_mock, config_entry, tmp_path):
     return root, digest
 
 
+async def _install_url(hass, mqtt_mock) -> str:
+    mqtt_mock.async_publish.reset_mock()
+    await hass.services.async_call("update", "install", {"entity_id": ENTITY}, blocking=True)
+    cmds = [c.args for c in mqtt_mock.async_publish.call_args_list if c.args[0] == f"{BASE}/cmd"]
+    assert len(cmds) == 1
+    return cmds[0][1].split()[1]
+
+
+async def test_base_url_migrated_to_default(hass, mqtt_mock, config_entry, apk_setup):
+    """An entry without base_url (0.1.0) is migrated to the default option."""
+    assert config_entry.minor_version == 2
+    assert config_entry.options[CONF_BASE_URL] == DEFAULT_BASE_URL == "http://192.168.5.166:8123"
+
+
+@pytest.mark.parametrize("base_url_option", ["http://10.0.0.7:8123/"])
+async def test_update_uses_base_url_option(hass, mqtt_mock, config_entry, apk_setup):
+    """The configured base_url wins over HA's internal URL (trailing slash stripped)."""
+    assert config_entry.options[CONF_BASE_URL] == "http://10.0.0.7:8123/"  # kept, not overwritten
+    url = await _install_url(hass, mqtt_mock)
+    assert re.fullmatch(r"http://10\.0\.0\.7:8123/api/astrion_remote/apk/[\w-]+", url), url
+
+
+@pytest.mark.parametrize("base_url_option", [""])
+async def test_update_empty_base_url_falls_back(hass, mqtt_mock, apk_setup):
+    """An empty base_url falls back to HA's internal URL."""
+    url = await _install_url(hass, mqtt_mock)
+    assert re.fullmatch(r"http://192\.168\.5\.10:8123/api/astrion_remote/apk/[\w-]+", url), url
+
+
+@pytest.mark.parametrize("base_url_option", [""])
+async def test_update_no_url_at_all(hass, mqtt_mock, apk_setup):
+    """No base_url and no HA URL -> a clear error."""
+    with patch(
+        "custom_components.astrion_remote.update.get_url", side_effect=NoURLAvailableError
+    ), pytest.raises(HomeAssistantError, match="Home Assistant URL"):
+        await hass.services.async_call("update", "install", {"entity_id": ENTITY}, blocking=True)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("", ""),
+        ("  http://192.168.5.166:8123/ ", "http://192.168.5.166:8123"),
+        ("https://ha.example.org", "https://ha.example.org"),
+    ],
+)
+def test_validate_base_url_ok(value, expected):
+    """Accepted URLs are normalized."""
+    assert validate_base_url(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "192.168.5.166:8123",
+        "ftp://host",
+        "http://host:8123/ha",
+        "http://host?x=1",
+        "http://user:pw@host",
+        "http://host:99999",
+        "http://",
+        "http://ho st",
+    ],
+)
+def test_validate_base_url_rejects(value):
+    """Scheme must be http(s); no path, query, credentials or bad port."""
+    with pytest.raises(ValueError):
+        validate_base_url(value)
+
+
 async def test_update_install(hass, mqtt_mock, apk_setup, hass_client_no_auth):
-    """Install publishes `update <url> <sha256>`; the URL works once."""
+    """Install publishes `update <url> <sha256>` (default base_url); the URL works once."""
     root, digest = apk_setup
     state = hass.states.get(ENTITY)
     assert state.state == STATE_ON
@@ -63,7 +156,7 @@ async def test_update_install(hass, mqtt_mock, apk_setup, hass_client_no_auth):
     assert len(cmds) == 1
     topic, payload, qos, retain = cmds[0]
     assert retain is False
-    match = re.fullmatch(r"update (http://192\.168\.5\.10:8123(/api/astrion_remote/apk/([\w-]+))) ([0-9a-f]{64})", payload)
+    match = re.fullmatch(r"update (http://192\.168\.5\.166:8123(/api/astrion_remote/apk/([\w-]+))) ([0-9a-f]{64})", payload)
     assert match, payload
     assert match.group(4) == digest
     assert len(match.group(3)) >= 43  # 32 random bytes, urlsafe base64

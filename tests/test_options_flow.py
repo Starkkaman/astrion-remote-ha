@@ -6,7 +6,7 @@ import yaml
 
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.astrion_remote.const import CONF_APK_DIR, CONF_CONFIG
+from custom_components.astrion_remote.const import CONF_APK_DIR, CONF_BASE_URL, CONF_CONFIG
 
 from .conftest import BASE
 
@@ -169,6 +169,41 @@ async def test_timings(hass, mqtt_mock, setup_entry):
     assert config["theme"] == {"mode": "night", "calm": True}
     assert setup_entry.options[CONF_APK_DIR] == "apks"
     assert _last_config(mqtt_mock)["timings"]["hold_ms"] == 500
+
+
+async def test_timings_base_url(hass, mqtt_mock, setup_entry):
+    """base_url is edited in Timings & theme; must be http(s)://host[:port] without a path."""
+    result = await _open(hass, setup_entry, "timings")
+    schema_keys = {str(k): k for k in result["data_schema"].schema}
+    assert schema_keys[CONF_BASE_URL].description == {"suggested_value": "http://192.168.5.166:8123"}
+    user = {
+        "hold_ms": 450,
+        "double_ms": 350,
+        "keepalive_ms": 300,
+        "theme_mode": "auto",
+        "calm": False,
+        "keytopic": "controlfreak/hisense_tv/key/set",
+    }
+    for bad in ("192.168.5.20:8123", "http://192.168.5.20:8123/lovelace", "ftp://192.168.5.20"):
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {**user, CONF_BASE_URL: bad})
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {CONF_BASE_URL: "invalid_base_url"}
+    assert setup_entry.options[CONF_BASE_URL] == "http://192.168.5.166:8123"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**user, CONF_BASE_URL: "https://192.168.5.20:8123/"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert setup_entry.options[CONF_BASE_URL] == "https://192.168.5.20:8123"
+    assert setup_entry.options[CONF_APK_DIR] == ""
+
+    # cleared field (frontend omits it) -> empty -> fall back to HA's internal URL
+    result = await _open(hass, setup_entry, "timings")
+    result = await hass.config_entries.options.async_configure(result["flow_id"], user)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert setup_entry.options[CONF_BASE_URL] == ""
+    assert setup_entry.runtime_data.base_url == ""
 
 
 async def test_yaml_import_export(hass, mqtt_mock, setup_entry):

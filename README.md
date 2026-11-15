@@ -36,15 +36,17 @@ Computed on every publish, never stored:
 ## Options (Configure)
 - **Keys**: key → gesture (tap/double/hold) → action type; `ha` uses the action selector (hold: optional *repeat*).
 - **Pages**: YAML editor, validated against the section schema.
-- **Timings & theme**: hold/double/keepalive ms, theme, calm, TV key topic, context entity, APK sub directory.
+- **Timings & theme**: hold/double/keepalive ms, theme, calm, TV key topic, context entity, APK sub directory,
+  Home Assistant URL reachable from the remote (`base_url`, default `http://192.168.5.166:8123`).
 - **Import/export**: the whole config as YAML (`allow` is ignored on import and recomputed).
 Every change republishes `config` (retained) and resyncs the state mirror without reloading the entry.
 
 ## App updates
 Put `astrion-<version>.apk` plus `astrion-<version>.apk.sha256` (or `astrion-<version>.sha256`; `sha256sum` output is fine)
 in `/config/astrion_remote/` (or the configured sub directory). Install verifies the file hash, issues a one-time URL
-`<internal_url>/api/astrion_remote/apk/<32-byte token>` (one download, 10 minutes) and publishes `update <url> <sha256>`.
-Set an internal URL under Settings → System → Network.
+`<base_url>/api/astrion_remote/apk/<32-byte token>` (one download, 10 minutes) and publishes `update <url> <sha256>`.
+`base_url` is the *Home Assistant URL reachable from the remote* option (Timings & theme; `http(s)://host[:port]`, no
+path). Leave it empty to fall back to Home Assistant's internal URL (Settings → System → Network).
 
 ## Services
 `astrion_remote.toast` (`text`), `astrion_remote.page` (`id`), `astrion_remote.reload`; optional `device_id` to target one remote.

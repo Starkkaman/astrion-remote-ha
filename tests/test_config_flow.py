@@ -17,6 +17,7 @@ async def test_user_flow_defaults(hass, mqtt_mock):
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {"device_id": "ha100", "base_topic": "astrion/ha100"}
     assert result["options"][CONF_APK_DIR] == ""
+    assert result["options"]["base_url"] == "http://192.168.5.166:8123"
     config = result["options"][CONF_CONFIG]
     assert [p["id"] for p in config["pages"]] == ["now", "watch", "room", "music"]
     assert "allow" not in config  # computed at publish time

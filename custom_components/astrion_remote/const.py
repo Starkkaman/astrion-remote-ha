@@ -10,9 +10,12 @@ CONF_DEVICE_ID: Final = "device_id"
 CONF_BASE_TOPIC: Final = "base_topic"
 CONF_CONFIG: Final = "config"
 CONF_APK_DIR: Final = "apk_dir"
+CONF_BASE_URL: Final = "base_url"
 
 DEFAULT_DEVICE_ID: Final = "ha100"
 DEFAULT_BASE_TOPIC: Final = "astrion/ha100"
+# HA URL the remote uses to download APKs (empty = HA's own internal URL).
+DEFAULT_BASE_URL: Final = "http://192.168.5.166:8123"
 
 # Directory (under the HA config dir) that holds astrion-<version>.apk files.
 APK_ROOT_DIRNAME: Final = "astrion_remote"

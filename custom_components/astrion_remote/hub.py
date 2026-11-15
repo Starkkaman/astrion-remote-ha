@@ -24,6 +24,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_APK_DIR,
+    CONF_BASE_URL,
     CONF_BASE_TOPIC,
     CONF_CONFIG,
     CONF_DEVICE_ID,
@@ -122,6 +123,11 @@ class AstrionHub:
     def apk_subdir(self) -> str:
         """Configured APK sub directory (relative to /config/astrion_remote)."""
         return self.entry.options.get(CONF_APK_DIR, "") or ""
+
+    @property
+    def base_url(self) -> str:
+        """HA URL reachable from the remote ("" = use HA's own internal URL)."""
+        return (self.entry.options.get(CONF_BASE_URL, "") or "").strip().rstrip("/")
 
     @property
     def device_info(self) -> DeviceInfo:
