@@ -53,7 +53,7 @@ class AstrionConfigFlow(ConfigFlow, domain=DOMAIN):
     """One entry per remote."""
 
     VERSION = 1
-    MINOR_VERSION = 3
+    MINOR_VERSION = 4
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Ask for the device id and base topic."""

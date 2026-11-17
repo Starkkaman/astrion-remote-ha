@@ -18,7 +18,17 @@ const ACTION_TYPES = [
   ["none", "Nothing"],
   ["app", "App command"],
   ["voice", "Voice"],
+  ["choose", "Choose from list"],
 ];
+
+const CHOOSE_DOMAINS = ["select", "input_select"];
+
+// visible_if: section shown only while the entity's state is (not) one of these.
+const VISIBLE_MODES = [
+  ["state_not", "is not one of"],
+  ["state_in", "is one of"],
+];
+const COMMON_STATES = ["off", "on", "idle", "standby", "unavailable", "playing", "paused", "buffering", "unknown"];
 
 const VOICE_TARGETS = [
   ["ha", "Home Assistant Assist"],
@@ -463,6 +473,11 @@ class AstrionRemotePanel extends HTMLElement {
         return `App: ${action.cmd || ""}`;
       case "voice":
         return action.target === "tv" ? "Voice: TV Assistant" : "Voice: HA Assist";
+      case "choose": {
+        if (!action.entity) return "Choose from list";
+        const friendly = this._hass?.states?.[action.entity]?.attributes?.friendly_name || action.entity.split(".").pop();
+        return `Choose: ${action.title || friendly}`;
+      }
       default:
         return String(action.type || "?");
     }
@@ -496,6 +511,15 @@ class AstrionRemotePanel extends HTMLElement {
     const label = (child) => h("label", { class: "fallback" }, opts.label ? h("span", {}, opts.label) : null, child);
     if (selector.boolean) {
       return label(h("input", { type: "checkbox", checked: !!value, "on:change": (e) => onChange(e.target.checked) }));
+    }
+    if (selector.select && selector.select.multiple) {
+      return label(
+        h("input", {
+          value: arr(value).join(", "),
+          placeholder: "comma separated",
+          "on:change": (e) => onChange(e.target.value.split(",").map((x) => x.trim()).filter(Boolean)),
+        })
+      );
     }
     if (selector.select) {
       const options = arr(selector.select.options).map((o) => (isObj(o) ? o : { value: o, label: o }));
@@ -635,6 +659,7 @@ class AstrionRemotePanel extends HTMLElement {
             else if (v === "app") next.cmd = "settings";
             else if (v === "ha") next.action = "";
             else if (v === "voice") next.target = "ha";
+            else if (v === "choose") next.entity = "";
             set(next);
           }
           draw();
@@ -700,6 +725,17 @@ class AstrionRemotePanel extends HTMLElement {
         }
       } else if (type === "app") {
         fields.push(this._select(APP_CMDS, cur.cmd ?? "settings", (v) => patch({ cmd: v }), { label: "Command" }));
+      } else if (type === "choose") {
+        fields.push(
+          this._sel({ entity: { filter: { domain: CHOOSE_DOMAINS } } }, cur.entity ?? "", (v) => patch({ entity: v || "" }), {
+            label: "List (select / input_select)",
+            required: true,
+          })
+        );
+        fields.push(this._text(cur.title, (v) => patch({ title: v || undefined }), "Chooser title (optional)"));
+        if (hint) {
+          fields.push(h("div", { class: "hint" }, "Opens a list of the entity's options on the remote; picking one selects it."));
+        }
       } else if (type === "voice") {
         fields.push(this._select(VOICE_TARGETS, cur.target ?? "ha", (v) => {
             patch({ target: v || "ha" });
@@ -1212,6 +1248,7 @@ class AstrionRemotePanel extends HTMLElement {
       "div",
       { class: "section-head" },
       h("span", { class: "type-badge" }, typeLabel),
+      isObj(section.visible_if) ? h("span", { class: "sub" }, this._visibleSummary(section.visible_if)) : null,
       h("div", { class: "grow" }),
       this._iconButton("mdi:arrow-up", "Move up", () => {
         [sections[si - 1], sections[si]] = [sections[si], sections[si - 1]];
@@ -1317,11 +1354,71 @@ class AstrionRemotePanel extends HTMLElement {
       default:
         body.push(h("p", { class: "hint" }, "Unknown section type; edit it in the YAML tab."));
     }
+    body.push(this._visibleIfEditor(section, redraw));
     return h(
       "ha-card",
       { class: "section-card", "@data-path": JSON.stringify(path) },
       h("div", { class: "card-content" }, header, ...body)
     );
+  }
+
+  _visibleSummary(cond) {
+    if (!isObj(cond) || !cond.entity) return "Always shown";
+    const mode = Array.isArray(cond.state_in) ? "state_in" : "state_not";
+    const states = arr(cond[mode]);
+    const friendly = this._hass?.states?.[cond.entity]?.attributes?.friendly_name || cond.entity;
+    const list = states.length ? states.join(", ") : "(no states)";
+    return `Shown when ${friendly} ${mode === "state_in" ? "is" : "is not"} ${list}`;
+  }
+
+  /** "Show only when…": visible_if = {entity, state_not | state_in: [..]} (exactly one list). */
+  _visibleIfEditor(section, redraw) {
+    const cond = isObj(section.visible_if) ? section.visible_if : null;
+    const mode = cond && Array.isArray(cond.state_in) ? "state_in" : "state_not";
+    const content = [];
+    if (!cond) {
+      content.push(h("div", { class: "hint" }, "Always shown."));
+      content.push(
+        h("div", { class: "actions-row" }, this._button("Add condition", () => {
+          section.visible_if = { entity: "", state_not: ["off", "idle", "unavailable", "standby"] };
+          redraw();
+        }))
+      );
+    } else {
+      content.push(
+        this._sel({ entity: {} }, cond.entity ?? "", (v) => {
+          cond.entity = v || "";
+          this._touched();
+        }, { label: "Entity", required: true })
+      );
+      content.push(
+        this._select(VISIBLE_MODES, mode, (v) => {
+          if (!v || v === mode) return;
+          const states = arr(cond[mode]);
+          delete cond.state_not;
+          delete cond.state_in;
+          cond[v] = states;
+          redraw();
+        }, { label: "State" })
+      );
+      const options = [...new Set([...COMMON_STATES, ...arr(cond[mode])])].map((o) => ({ value: o, label: o }));
+      content.push(
+        this._sel({ select: { options, multiple: true, custom_value: true, mode: "dropdown" } }, arr(cond[mode]), (v) => {
+          cond[mode] = arr(v).map(String).filter(Boolean);
+          this._touched();
+        }, { label: "States" })
+      );
+      content.push(
+        h("div", { class: "actions-row" }, this._button("Remove condition", () => {
+          delete section.visible_if;
+          redraw();
+        }, { danger: true }))
+      );
+    }
+    return this._panelBox("Show only when…", content, {
+      expanded: !!cond && !cond.entity,
+      secondary: this._visibleSummary(cond),
+    });
   }
 
   _itemsEditor(section, field, title, make, renderItem, redraw, path) {

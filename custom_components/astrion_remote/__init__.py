@@ -31,9 +31,15 @@ from .const import (
     SERVICE_RELOAD,
     SERVICE_TOAST,
 )
-from .default_config import DEFAULT_CONFIG, OLD_VOICE_DEFAULTS
+from .default_config import (
+    DEFAULT_CONFIG,
+    OLD_COLOUR_KEY_TAPS,
+    OLD_DEFAULT_PAGES_0_3_0,
+    OLD_VOICE_DEFAULTS,
+)
 from .hub import AstrionHub
 from .panel import async_register_panel, async_register_static, async_remove_panel
+from .schema import ACTION, validate_pages
 from .websocket import async_register as async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,10 +127,50 @@ def migrate_voice_key(config: dict[str, Any]) -> dict[str, Any] | None:
     return out
 
 
+def _same_action(a: Any, b: dict[str, Any]) -> bool:
+    try:
+        return ACTION(a) == ACTION(b)
+    except vol.Invalid:
+        return False
+
+
+def _same_pages(a: Any, b: list[dict[str, Any]]) -> bool:
+    try:
+        return validate_pages(a) == validate_pages(b)
+    except vol.Invalid:
+        return False
+
+
+def migrate_v3_defaults(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a copy of `config` moved to the v3 defaults where untouched, or None if nothing changes.
+
+    - A colour key's tap is replaced only if it is still exactly the 0.3.0 select_next cycle.
+    - Pages are replaced only if they still equal the 0.3.0 default pages; otherwise kept.
+    - The theme is the user's choice and is never touched.
+    """
+    out = copy.deepcopy(config)
+    changed = False
+    keys = out.get("keys")
+    if isinstance(keys, dict):
+        for colour, old_tap in OLD_COLOUR_KEY_TAPS.items():
+            key = keys.get(colour)
+            if isinstance(key, dict) and _same_action(key.get("tap"), old_tap):
+                key["tap"] = copy.deepcopy(DEFAULT_CONFIG["keys"][colour]["tap"])
+                changed = True
+    if _same_pages(out.get("pages"), OLD_DEFAULT_PAGES_0_3_0):
+        out["pages"] = copy.deepcopy(DEFAULT_CONFIG["pages"])
+        changed = True
+    else:
+        _LOGGER.info("Astrion: pages differ from the 0.3.0 default; keeping your pages (v3 layout not applied)")
+    return out if changed else None
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: AstrionConfigEntry) -> bool:
     """1.1 -> 1.2: add the base_url option (HA URL reachable from the remote).
 
     1.2 -> 1.3: voice key tap/hold -> voice ha/tv, if it is still the old default.
+
+    1.3 -> 1.4: v3 defaults (choose on colour keys, new pages), only where still the 0.3.0 default.
     """
     if entry.version > 1:
         return False
@@ -139,6 +185,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: AstrionConfigEntry) ->
         ) is not None:
             options[CONF_CONFIG] = migrated
         hass.config_entries.async_update_entry(entry, options=options, minor_version=3)
+    if entry.version == 1 and entry.minor_version < 4:
+        options = dict(entry.options)
+        if isinstance(config := options.get(CONF_CONFIG), dict) and (
+            migrated := migrate_v3_defaults(config)
+        ) is not None:
+            options[CONF_CONFIG] = migrated
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=4)
     return True
 
 

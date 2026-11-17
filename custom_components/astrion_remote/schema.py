@@ -55,6 +55,10 @@ TARGET_SCHEMA = vol.Schema({vol.Required("entity_id"): entity_ids})
 
 _DECORATION = {vol.Optional("label"): str, vol.Optional("icon"): str}
 
+_CHOOSABLE = vol.All(
+    entity_id, vol.Match(r"^(select|input_select)\.", msg="needs a select/input_select entity")
+)
+
 _ACTION_SCHEMAS: dict[str, dict[Any, Any]] = {
     "tv_key": {
         vol.Required("key"): vol.All(str, vol.Length(min=1)),
@@ -72,6 +76,8 @@ _ACTION_SCHEMAS: dict[str, dict[Any, Any]] = {
     "app": {vol.Required("cmd"): vol.In(APP_CMDS)},
     # ha = HA Assist through the integration's assist_satellite; tv = Google Assistant on the TV.
     "voice": {vol.Required("target"): vol.In(VOICE_TARGETS)},
+    # Opens the on-remote chooser; picking sends <domain>.select_option (allowlisted automatically).
+    "choose": {vol.Required("entity"): _CHOOSABLE, vol.Optional("title"): str},
     "none": {},
 }
 
@@ -129,8 +135,27 @@ TILE_SCHEMA = vol.Schema(
         vol.Optional("icon"): str,
         vol.Optional("entity"): entity_id,
         vol.Optional("action"): ACTION,
+        # Layout hint only (e.g. "quick"); the app may ignore it.
+        vol.Optional("size"): str,
     }
 )
+
+
+def _visible_if(value: Any) -> dict[str, Any]:
+    """`{"entity", "state_not": [..]}` or `{"entity", "state_in": [..]}` (exactly one of the two)."""
+    out = vol.Schema(
+        {
+            vol.Required("entity"): entity_id,
+            vol.Optional("state_not"): [str],
+            vol.Optional("state_in"): [str],
+        }
+    )(value)
+    if ("state_not" in out) == ("state_in" in out):
+        raise vol.Invalid("visible_if needs exactly one of state_not / state_in")
+    return out
+
+
+_SECTION_COMMON = {vol.Optional("visible_if"): _visible_if}
 
 _SECTION_SCHEMAS: dict[str, vol.Schema] = {
     "now_playing": vol.Schema(
@@ -200,7 +225,7 @@ def SECTION(value: Any) -> dict[str, Any]:  # noqa: N802
     typ = value.get("type")
     if typ not in _SECTION_SCHEMAS:
         raise vol.Invalid(f"unknown section type: {typ!r}")
-    return _SECTION_SCHEMAS[typ](value)
+    return _SECTION_SCHEMAS[typ].extend(_SECTION_COMMON)(value)
 
 
 PAGE_SCHEMA = vol.Schema(
@@ -258,6 +283,10 @@ _CONFIG_SCHEMA = vol.Schema(
         vol.Optional("allow"): [str],
     }
 )
+
+
+def _choose_service(entity: str) -> str:
+    return f"{entity.split('.', 1)[0]}.select_option"
 
 
 def iter_actions(config: dict[str, Any]) -> Iterator[dict[str, Any]]:
@@ -356,6 +385,9 @@ def compute_allowlist(config: dict[str, Any]) -> list[str]:
     """Return the sorted allowlist: `action:entity_id`, or bare `action` when untargeted."""
     allow: set[str] = set()
     for action in iter_actions(config):
+        if action["type"] == "choose":
+            allow.add(f"{_choose_service(action['entity'])}:{action['entity']}")
+            continue
         if action["type"] != "ha":
             continue
         ids = action.get("target", {}).get("entity_id", [])
@@ -381,8 +413,12 @@ def referenced_entities(config: dict[str, Any]) -> set[str]:
     for action in iter_actions(config):
         if action["type"] == "ha":
             found.update(action.get("target", {}).get("entity_id", []))
+        elif action["type"] == "choose":
+            found.add(action["entity"])  # its `options` attribute feeds the chooser
     for page in config.get("pages", []):
         for section in page.get("sections", []):
+            if cond := section.get("visible_if"):
+                found.add(cond["entity"])
             if "entity" in section:
                 found.add(section["entity"])
             for item in section.get("items", []):
