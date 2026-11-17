@@ -54,7 +54,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "keytopic": "controlfreak/hisense_tv/key/set",
         "context_entity": "sensor.hisense_tv_current_app",
     },
-    "theme": {"mode": "auto", "calm": False},
+    "theme": {"mode": "night", "calm": False},
     "keys": {
         "up": {"tap": _tv("DPAD_UP")},
         "down": {"tap": _tv("DPAD_DOWN")},
