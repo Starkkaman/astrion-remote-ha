@@ -11,6 +11,8 @@ CONF_BASE_TOPIC: Final = "base_topic"
 CONF_CONFIG: Final = "config"
 CONF_APK_DIR: Final = "apk_dir"
 CONF_BASE_URL: Final = "base_url"
+# Options: the config as it was before the last reset_to_defaults (one-step undo).
+CONF_PREVIOUS_CONFIG: Final = "previous_config"
 
 DEFAULT_DEVICE_ID: Final = "ha100"
 DEFAULT_BASE_TOPIC: Final = "astrion/ha100"
@@ -211,3 +213,8 @@ SIGNAL_UPDATE: Final = "astrion_remote_update_{}"
 SERVICE_TOAST: Final = "toast"
 SERVICE_PAGE: Final = "page"
 SERVICE_RELOAD: Final = "reload"
+SERVICE_RESET_TO_DEFAULTS: Final = "reset_to_defaults"
+SERVICE_UNDO_RESET: Final = "undo_reset"
+
+# Top-level config parts reset_to_defaults can replace.
+RESET_PARTS: Final = ("pages", "keys", "timings", "theme")

@@ -16,6 +16,8 @@
   "services": {
     "toast": {"service": "mdi:message-text"},
     "page": {"service": "mdi:book-open-page-variant"},
-    "reload": {"service": "mdi:reload"}
+    "reload": {"service": "mdi:reload"},
+    "reset_to_defaults": {"service": "mdi:restore"},
+    "undo_reset": {"service": "mdi:undo"}
   }
 }

@@ -317,6 +317,30 @@
           "description": "Remote(s) to target. Leave empty for all."
         }
       }
+    },
+    "reset_to_defaults": {
+      "name": "Reset to defaults",
+      "description": "Replace parts of a remote's config with the current defaults. The previous config is kept for one undo.",
+      "fields": {
+        "entry_id": {
+          "name": "Remote",
+          "description": "Config entry of the remote. Optional if there is only one."
+        },
+        "parts": {
+          "name": "Parts",
+          "description": "What to reset: pages, keys, timings and/or theme. Default: pages."
+        }
+      }
+    },
+    "undo_reset": {
+      "name": "Undo reset",
+      "description": "Restore the config as it was before the last reset to defaults (once).",
+      "fields": {
+        "entry_id": {
+          "name": "Remote",
+          "description": "Config entry of the remote. Optional if there is only one."
+        }
+      }
     }
   }
 }

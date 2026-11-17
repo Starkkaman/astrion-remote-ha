@@ -22,10 +22,12 @@ from .const import (
     KEY_GROUPS,
     KEY_IDS,
     KEY_LABELS,
+    RESET_PARTS,
     SCHEMA_VERSION,
     TV_KEYS,
 )
 from .default_config import DEFAULT_CONFIG
+from .reset import ResetError, async_reset, async_undo_reset, has_previous
 from .schema import validate_config
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_config_get)
     websocket_api.async_register_command(hass, ws_config_validate)
     websocket_api.async_register_command(hass, ws_config_set)
+    websocket_api.async_register_command(hass, ws_config_reset)
+    websocket_api.async_register_command(hass, ws_config_undo_reset)
     websocket_api.async_register_command(hass, ws_tv_keys)
 
 
@@ -197,6 +201,7 @@ async def ws_config_get(
             "schema_version": SCHEMA_VERSION,
             "keys": _key_list(),
             "context_values": await _context_values(hass, config),
+            "can_undo": has_previous(entry),
         },
     )
 
@@ -237,6 +242,46 @@ async def ws_config_set(
     if not changed and entry.state is ConfigEntryState.LOADED:
         await entry.runtime_data.async_apply_options()
     connection.send_result(msg["id"], {"config": copy.deepcopy(config)})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "astrion_remote/config/reset",
+        **_ENTRY,
+        vol.Optional("parts", default=["pages"]): vol.All([vol.In(RESET_PARTS)], vol.Length(min=1)),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_config_reset(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Replace parts with the defaults (the panel asks for confirmation first); same as the service."""
+    if (entry := _get_entry(hass, connection, msg)) is None:
+        return
+    try:
+        config = await async_reset(hass, entry, msg["parts"])
+    except ResetError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"], {"config": config, "can_undo": has_previous(entry)})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "astrion_remote/config/undo_reset", **_ENTRY})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_config_undo_reset(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Restore the config saved by the last reset; same as the service."""
+    if (entry := _get_entry(hass, connection, msg)) is None:
+        return
+    try:
+        config = await async_undo_reset(hass, entry)
+    except ResetError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, str(err))
+        return
+    connection.send_result(msg["id"], {"config": config, "can_undo": has_previous(entry)})
 
 
 def _errors_text(errors: list[dict[str, Any]]) -> str:

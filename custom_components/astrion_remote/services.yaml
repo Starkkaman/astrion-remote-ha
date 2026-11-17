@@ -35,3 +35,29 @@ reload:
           multiple: true
           filter:
             integration: astrion_remote
+reset_to_defaults:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: astrion_remote
+    parts:
+      required: false
+      default:
+        - pages
+      selector:
+        select:
+          multiple: true
+          options:
+            - pages
+            - keys
+            - timings
+            - theme
+undo_reset:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: astrion_remote

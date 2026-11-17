@@ -27,9 +27,12 @@ from .const import (
     CONF_CONFIG,
     DEFAULT_BASE_URL,
     DOMAIN,
+    RESET_PARTS,
     SERVICE_PAGE,
     SERVICE_RELOAD,
+    SERVICE_RESET_TO_DEFAULTS,
     SERVICE_TOAST,
+    SERVICE_UNDO_RESET,
 )
 from .default_config import (
     DEFAULT_CONFIG,
@@ -39,6 +42,7 @@ from .default_config import (
 )
 from .hub import AstrionHub
 from .panel import async_register_panel, async_register_static, async_remove_panel
+from .reset import ResetError, async_reset, async_undo_reset
 from .schema import ACTION, validate_pages
 from .websocket import async_register as async_register_websocket
 
@@ -61,6 +65,25 @@ _TARGET = {vol.Optional("device_id"): vol.All(cv.ensure_list, [cv.string])}
 TOAST_SCHEMA = vol.Schema({vol.Required("text"): vol.All(cv.string, vol.Length(min=1, max=500)), **_TARGET})
 PAGE_SCHEMA = vol.Schema({vol.Required("id"): vol.All(cv.string, vol.Length(min=1)), **_TARGET})
 RELOAD_SCHEMA = vol.Schema(_TARGET)
+_ENTRY_ID = {vol.Optional("entry_id"): cv.string}
+RESET_SCHEMA = vol.Schema(
+    {**_ENTRY_ID, vol.Optional("parts", default=["pages"]): vol.All(cv.ensure_list, [vol.In(RESET_PARTS)])}
+)
+UNDO_RESET_SCHEMA = vol.Schema(_ENTRY_ID)
+
+
+def _entry_for_call(hass: HomeAssistant, call: ServiceCall) -> ConfigEntry:
+    """The entry named by `entry_id`, or the only one if there is exactly one."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if entry_id := call.data.get("entry_id"):
+        entries = [e for e in entries if e.entry_id == entry_id]
+        if not entries:
+            raise ServiceValidationError(f"Unknown Astrion remote {entry_id}")
+    elif len(entries) != 1:
+        raise ServiceValidationError(
+            "No Astrion remote is configured" if not entries else "Several remotes: give entry_id"
+        )
+    return entries[0]
 
 
 def _hubs_for_call(hass: HomeAssistant, call: ServiceCall) -> list[AstrionHub]:
@@ -109,7 +132,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.services.async_register(DOMAIN, SERVICE_TOAST, toast, schema=TOAST_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_PAGE, page, schema=PAGE_SCHEMA)
+    async def reset_to_defaults(call: ServiceCall) -> None:
+        try:
+            await async_reset(hass, _entry_for_call(hass, call), call.data["parts"])
+        except ResetError as err:
+            raise ServiceValidationError(str(err)) from err
+
+    async def undo_reset(call: ServiceCall) -> None:
+        try:
+            await async_undo_reset(hass, _entry_for_call(hass, call))
+        except ResetError as err:
+            raise ServiceValidationError(str(err)) from err
+
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, reload, schema=RELOAD_SCHEMA)
+    hass.services.async_register(DOMAIN, SERVICE_RESET_TO_DEFAULTS, reset_to_defaults, schema=RESET_SCHEMA)
+    hass.services.async_register(DOMAIN, SERVICE_UNDO_RESET, undo_reset, schema=UNDO_RESET_SCHEMA)
     return True
 
 

@@ -1,0 +1,647 @@
+{
+ "schema_version": 1,
+ "timings": {
+  "hold_ms": 450,
+  "double_ms": 350,
+  "keepalive_ms": 300
+ },
+ "tv": {
+  "keytopic": "controlfreak/hisense_tv/key/set",
+  "context_entity": "sensor.hisense_tv_current_app"
+ },
+ "theme": {
+  "mode": "auto",
+  "calm": false
+ },
+ "keys": {
+  "up": {
+   "tap": {
+    "type": "tv_key",
+    "key": "DPAD_UP",
+    "hold": "passthrough"
+   }
+  },
+  "down": {
+   "tap": {
+    "type": "tv_key",
+    "key": "DPAD_DOWN",
+    "hold": "passthrough"
+   }
+  },
+  "left": {
+   "tap": {
+    "type": "tv_key",
+    "key": "DPAD_LEFT",
+    "hold": "passthrough"
+   }
+  },
+  "right": {
+   "tap": {
+    "type": "tv_key",
+    "key": "DPAD_RIGHT",
+    "hold": "passthrough"
+   }
+  },
+  "ok": {
+   "tap": {
+    "type": "tv_key",
+    "key": "DPAD_CENTER",
+    "hold": "passthrough"
+   }
+  },
+  "back": {
+   "tap": {
+    "type": "tv_key",
+    "key": "BACK",
+    "hold": "passthrough"
+   }
+  },
+  "menu": {
+   "tap": {
+    "type": "tv_key",
+    "key": "MENU",
+    "hold": "passthrough"
+   }
+  },
+  "vol_up": {
+   "tap": {
+    "type": "ha",
+    "action": "script.turn_on",
+    "target": {
+     "entity_id": [
+      "script.stereo_volume_up"
+     ]
+    }
+   },
+   "hold": {
+    "type": "ha",
+    "action": "script.turn_on",
+    "target": {
+     "entity_id": [
+      "script.stereo_volume_up"
+     ]
+    },
+    "repeat": true
+   }
+  },
+  "vol_down": {
+   "tap": {
+    "type": "ha",
+    "action": "script.turn_on",
+    "target": {
+     "entity_id": [
+      "script.stereo_volume_down"
+     ]
+    }
+   },
+   "hold": {
+    "type": "ha",
+    "action": "script.turn_on",
+    "target": {
+     "entity_id": [
+      "script.stereo_volume_down"
+     ]
+    },
+    "repeat": true
+   }
+  },
+  "mute": {
+   "tap": {
+    "type": "ha",
+    "action": "button.press",
+    "target": {
+     "entity_id": [
+      "button.stereo_volume_mute"
+     ]
+    }
+   }
+  },
+  "page_up": {
+   "tap": {
+    "type": "page",
+    "page": "prev"
+   }
+  },
+  "page_down": {
+   "tap": {
+    "type": "page",
+    "page": "next"
+   }
+  },
+  "red": {
+   "tap": {
+    "type": "ha",
+    "action": "select.select_next",
+    "target": {
+     "entity_id": [
+      "select.phoster_subtitles"
+     ]
+    },
+    "data": {
+     "cycle": true
+    }
+   }
+  },
+  "green": {
+   "tap": {
+    "type": "ha",
+    "action": "select.select_next",
+    "target": {
+     "entity_id": [
+      "select.phoster_audio_track"
+     ]
+    },
+    "data": {
+     "cycle": true
+    }
+   }
+  },
+  "yellow": {
+   "tap": {
+    "type": "ha",
+    "action": "input_select.select_next",
+    "target": {
+     "entity_id": [
+      "input_select.light_scenes"
+     ]
+    },
+    "data": {
+     "cycle": true
+    }
+   }
+  },
+  "blue": {
+   "tap": {
+    "type": "ha",
+    "action": "select.select_next",
+    "target": {
+     "entity_id": [
+      "select.hisense_tv_picture_mode"
+     ]
+    },
+    "data": {
+     "cycle": true
+    }
+   }
+  },
+  "home": {
+   "tap": {
+    "type": "page",
+    "page": "now"
+   },
+   "double": {
+    "type": "tv_key",
+    "key": "HOME",
+    "hold": "none"
+   }
+  },
+  "power": {
+   "tap": {
+    "type": "event"
+   }
+  },
+  "voice": {
+   "tap": {
+    "type": "voice",
+    "target": "ha"
+   },
+   "hold": {
+    "type": "voice",
+    "target": "tv"
+   }
+  },
+  "sc1": {
+   "tap": {
+    "type": "none"
+   }
+  },
+  "sc2": {
+   "tap": {
+    "type": "none"
+   }
+  },
+  "sc3": {
+   "tap": {
+    "type": "none"
+   }
+  },
+  "sc4": {
+   "tap": {
+    "type": "none"
+   }
+  }
+ },
+ "pages": [
+  {
+   "id": "now",
+   "title": "Now",
+   "sections": [
+    {
+     "type": "now_playing",
+     "entity": "media_player.phoster_3",
+     "buttons": [
+      {
+       "type": "ha",
+       "action": "select.select_next",
+       "target": {
+        "entity_id": [
+         "select.phoster_subtitles"
+        ]
+       },
+       "data": {
+        "cycle": true
+       },
+       "label": "Subtitles",
+       "icon": "mdi:subtitles"
+      },
+      {
+       "type": "ha",
+       "action": "select.select_next",
+       "target": {
+        "entity_id": [
+         "select.phoster_audio_track"
+        ]
+       },
+       "data": {
+        "cycle": true
+       },
+       "label": "Audio",
+       "icon": "mdi:translate"
+      },
+      {
+       "type": "ha",
+       "action": "button.press",
+       "target": {
+        "entity_id": [
+         "button.phoster_previous_chapter"
+        ]
+       },
+       "label": "Prev chapter",
+       "icon": "mdi:skip-previous"
+      },
+      {
+       "type": "ha",
+       "action": "button.press",
+       "target": {
+        "entity_id": [
+         "button.phoster_next_chapter"
+        ]
+       },
+       "label": "Next chapter",
+       "icon": "mdi:skip-next"
+      },
+      {
+       "type": "ha",
+       "action": "button.press",
+       "target": {
+        "entity_id": [
+         "button.phoster_skip_segment"
+        ]
+       },
+       "label": "Skip",
+       "icon": "mdi:debug-step-over"
+      }
+     ]
+    },
+    {
+     "type": "segmented",
+     "entity": "select.hisense_tv_picture_mode",
+     "title": "Picture"
+    },
+    {
+     "type": "segmented",
+     "entity": "select.hisense_tv_audio_output",
+     "title": "Sound out"
+    }
+   ]
+  },
+  {
+   "id": "watch",
+   "title": "Watch",
+   "sections": [
+    {
+     "type": "tiles",
+     "title": "Apps",
+     "columns": 3,
+     "items": [
+      {
+       "label": "Jamfin TV",
+       "entity": "select.hisense_tv_launch_app",
+       "action": {
+        "type": "ha",
+        "action": "select.select_option",
+        "target": {
+         "entity_id": [
+          "select.hisense_tv_launch_app"
+         ]
+        },
+        "data": {
+         "option": "Jamfin TV"
+        }
+       }
+      },
+      {
+       "label": "YouTube",
+       "entity": "select.hisense_tv_launch_app",
+       "action": {
+        "type": "ha",
+        "action": "select.select_option",
+        "target": {
+         "entity_id": [
+          "select.hisense_tv_launch_app"
+         ]
+        },
+        "data": {
+         "option": "YouTube"
+        }
+       }
+      },
+      {
+       "label": "Netflix",
+       "entity": "select.hisense_tv_launch_app",
+       "action": {
+        "type": "ha",
+        "action": "select.select_option",
+        "target": {
+         "entity_id": [
+          "select.hisense_tv_launch_app"
+         ]
+        },
+        "data": {
+         "option": "Netflix"
+        }
+       }
+      },
+      {
+       "label": "Dropout",
+       "entity": "select.hisense_tv_launch_app",
+       "action": {
+        "type": "ha",
+        "action": "select.select_option",
+        "target": {
+         "entity_id": [
+          "select.hisense_tv_launch_app"
+         ]
+        },
+        "data": {
+         "option": "Dropout"
+        }
+       }
+      },
+      {
+       "label": "Corridor TV",
+       "entity": "select.hisense_tv_launch_app",
+       "action": {
+        "type": "ha",
+        "action": "select.select_option",
+        "target": {
+         "entity_id": [
+          "select.hisense_tv_launch_app"
+         ]
+        },
+        "data": {
+         "option": "Corridor TV"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "tiles",
+     "title": "Inputs",
+     "columns": 3,
+     "items": [
+      {
+       "label": "Nintendo",
+       "icon": "mdi:nintendo-switch",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.nintendo_input"
+         ]
+        }
+       }
+      },
+      {
+       "label": "Batocera",
+       "icon": "mdi:gamepad-variant",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.batocera_input_2"
+         ]
+        }
+       }
+      },
+      {
+       "label": "HDMI 2",
+       "icon": "mdi:video-input-hdmi",
+       "entity": "select.hisense_tv_input",
+       "action": {
+        "type": "ha",
+        "action": "select.select_option",
+        "target": {
+         "entity_id": [
+          "select.hisense_tv_input"
+         ]
+        },
+        "data": {
+         "option": "HDMI 2"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "keys",
+     "items": [
+      {
+       "label": "TV power",
+       "icon": "mdi:power",
+       "action": {
+        "type": "ha",
+        "action": "switch.toggle",
+        "target": {
+         "entity_id": [
+          "switch.hisense_tv_power"
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "slider",
+     "title": "Backlight",
+     "entity": "number.hisense_tv_backlight",
+     "action": {
+      "type": "ha",
+      "action": "number.set_value",
+      "target": {
+       "entity_id": [
+        "number.hisense_tv_backlight"
+       ]
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "room",
+   "title": "Room",
+   "sections": [
+    {
+     "type": "segmented",
+     "entity": "input_select.light_scenes",
+     "title": "Scene"
+    },
+    {
+     "type": "rocker",
+     "entity": "light.living_room_floor_lamp"
+    },
+    {
+     "type": "rocker",
+     "entity": "light.kajplats_e26_cws_globe_1100lm"
+    },
+    {
+     "type": "rocker",
+     "entity": "light.living_room"
+    },
+    {
+     "type": "switch",
+     "entity": "light.wled"
+    },
+    {
+     "type": "keys",
+     "title": "Stereo",
+     "items": [
+      {
+       "label": "Vol -",
+       "icon": "mdi:volume-minus",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.stereo_volume_down"
+         ]
+        }
+       }
+      },
+      {
+       "label": "Mute",
+       "icon": "mdi:volume-mute",
+       "action": {
+        "type": "ha",
+        "action": "button.press",
+        "target": {
+         "entity_id": [
+          "button.stereo_volume_mute"
+         ]
+        }
+       }
+      },
+      {
+       "label": "Vol +",
+       "icon": "mdi:volume-plus",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.stereo_volume_up"
+         ]
+        }
+       }
+      },
+      {
+       "label": "Power",
+       "icon": "mdi:power",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.stereo_power"
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "keys",
+     "title": "Stereo input",
+     "items": [
+      {
+       "label": "Video",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.stereo_input_select_video"
+         ]
+        }
+       }
+      },
+      {
+       "label": "Turntable",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.stereo_input_select_turntable"
+         ]
+        }
+       }
+      },
+      {
+       "label": "Music sync",
+       "action": {
+        "type": "ha",
+        "action": "script.turn_on",
+        "target": {
+         "entity_id": [
+          "script.stereo_input_select_music_sync"
+         ]
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "music",
+   "title": "Music",
+   "sections": [
+    {
+     "type": "now_playing",
+     "entity": "media_player.oneplus_speaker_2",
+     "buttons": []
+    },
+    {
+     "type": "now_playing",
+     "entity": "media_player.kitchen",
+     "buttons": []
+    },
+    {
+     "type": "now_playing",
+     "entity": "media_player.house",
+     "buttons": []
+    },
+    {
+     "type": "now_playing",
+     "entity": "media_player.phoster_2",
+     "buttons": []
+    }
+   ]
+  }
+ ]
+}

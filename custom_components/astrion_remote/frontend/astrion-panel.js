@@ -315,6 +315,7 @@ class AstrionRemotePanel extends HTMLElement {
       this._saved = JSON.stringify(this._config);
       this._keys = arr(data?.keys);
       this._contexts = arr(data?.context_values).map(String);
+      this._canUndo = !!data?.can_undo;
       this._tvKeys = arr(tv?.keys).map(String);
       this._errors = [];
       this._yamlPending = undefined;
@@ -381,6 +382,60 @@ class AstrionRemotePanel extends HTMLElement {
       this._saving = false;
       this._renderFooter();
     }
+  }
+
+  // ---- reset to defaults (stored and published server-side; one-step undo) -----------------
+  _afterReset(res, message) {
+    this._config = isObj(res?.config) ? res.config : this._config;
+    this._saved = JSON.stringify(this._config);
+    this._canUndo = !!res?.can_undo;
+    this._errors = [];
+    this._yamlPending = undefined;
+    this._message = message;
+    this._renderAll();
+  }
+
+  async _reset(part, question, done) {
+    if (this._saving) return;
+    const unsaved = this._dirty ? "\n\nYour unsaved changes will be discarded." : "";
+    if (!confirm(question + unsaved)) return;
+    this._saving = true;
+    try {
+      const res = await this._hass.callWS({ type: `${WS}/config/reset`, entry_id: this._entryId, parts: [part] });
+      this._afterReset(res, done);
+    } catch (err) {
+      this._errors = [{ path: [], msg: err?.message || String(err) }];
+      this._renderErrors();
+    } finally {
+      this._saving = false;
+      this._renderFooter();
+    }
+  }
+
+  async _undoReset() {
+    if (this._saving) return;
+    const unsaved = this._dirty ? "\n\nYour unsaved changes will be discarded." : "";
+    if (!confirm("Restore your config as it was before the last reset? Changes saved since then are lost." + unsaved)) return;
+    this._saving = true;
+    try {
+      const res = await this._hass.callWS({ type: `${WS}/config/undo_reset`, entry_id: this._entryId });
+      this._afterReset(res, "Reset undone and published");
+    } catch (err) {
+      this._errors = [{ path: [], msg: err?.message || String(err) }];
+      this._renderErrors();
+    } finally {
+      this._saving = false;
+      this._renderFooter();
+    }
+  }
+
+  _resetBar(part, label, question, done) {
+    return h(
+      "div",
+      { class: "tab-head" },
+      h("button", { class: "btn", "on:click": () => this._reset(part, question, done) }, label),
+      this._canUndo ? h("button", { class: "btn", "on:click": () => this._undoReset() }, "Undo reset") : null
+    );
   }
 
   _revert() {
@@ -957,7 +1012,15 @@ class AstrionRemotePanel extends HTMLElement {
   _renderButtons() {
     this._chipsEl = h("div", { class: "remote" });
     this._keyEditorEl = h("div", { class: "key-editor" });
-    this._bodyEl.replaceChildren(h("div", { class: "buttons-layout" }, h("div", { class: "remote-wrap" }, this._chipsEl), this._keyEditorEl));
+    this._bodyEl.replaceChildren(
+      this._resetBar(
+        "keys",
+        "Reset buttons to default",
+        "Replace your button mappings with the current default mappings? You can undo this once.",
+        "Buttons reset to default and published"
+      ),
+      h("div", { class: "buttons-layout" }, h("div", { class: "remote-wrap" }, this._chipsEl), this._keyEditorEl)
+    );
     this._renderChips();
     this._renderKeyEditor();
   }
@@ -1097,7 +1160,15 @@ class AstrionRemotePanel extends HTMLElement {
     if (this._selPage >= pages.length) this._selPage = Math.max(0, pages.length - 1);
     this._pageListEl = h("div", { class: "page-list" });
     this._pageDetailEl = h("div", { class: "page-detail" });
-    this._bodyEl.replaceChildren(h("div", { class: "pages-layout" }, this._pageListEl, this._pageDetailEl));
+    this._bodyEl.replaceChildren(
+      this._resetBar(
+        "pages",
+        "Reset pages to default",
+        "Replace your pages with the current default layout? You can undo this once.",
+        "Pages reset to default and published"
+      ),
+      h("div", { class: "pages-layout" }, this._pageListEl, this._pageDetailEl)
+    );
     this._renderPageList();
     this._renderPageDetail();
   }
@@ -1670,6 +1741,7 @@ ha-expansion-panel, .details { display: block; margin: 8px 0; }
 .btn.primary { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
 .btn.danger { color: var(--error-color); }
 .btn:disabled { opacity: .5; cursor: default; }
+.tab-head { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 `;
 
 if (!customElements.get("astrion-remote-panel")) {

@@ -47,7 +47,8 @@ Computed on every publish, never stored:
 - Changes are validated live; **Save** validates, stores in the entry options and republishes (same path as the
   options flow). The panel works even while MQTT is down; the config is published once the remote is set up.
 - Websocket API (admin): `astrion_remote/config/get`, `astrion_remote/config/validate`, `astrion_remote/config/set`
-  (`entry_id`, `config`) and `astrion_remote/tv_keys`.
+  (`entry_id`, `config`), `astrion_remote/config/reset` (`entry_id`, `parts`), `astrion_remote/config/undo_reset`
+  (`entry_id`) and `astrion_remote/tv_keys`.
 
 ## Options (Configure)
 The options flow stays available as a fallback editor.
@@ -75,6 +76,8 @@ requested as mp3. Upgrading from 0.2.x moves the voice key to the new default on
 
 ## Services
 `astrion_remote.toast` (`text`), `astrion_remote.page` (`id`), `astrion_remote.reload`; optional `device_id` to target one remote.
+
+`astrion_remote.reset_to_defaults` (`parts`: any of `pages`, `keys`, `timings`, `theme`; default `pages`) replaces those parts with the current defaults, stores and publishes; the previous config is kept in the entry options (`previous_config`, last one only) and `astrion_remote.undo_reset` restores it. Both take `entry_id` (optional with a single remote). The panel's Pages and Buttons tabs have the same "Reset … to default" / "Undo reset" buttons.
 
 ## Tests
 ```
