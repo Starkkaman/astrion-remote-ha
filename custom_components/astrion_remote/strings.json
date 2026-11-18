@@ -200,7 +200,9 @@
     "trigger_type": {
       "tap": "\"{subtype}\" pressed",
       "double": "\"{subtype}\" double-pressed",
-      "hold": "\"{subtype}\" held"
+      "hold": "\"{subtype}\" held",
+      "picked_up": "Picked up",
+      "put_down": "Put down"
     },
     "trigger_subtype": {
       "back": "Back",
@@ -238,6 +240,12 @@
       },
       "connectivity": {
         "name": "Connected"
+      },
+      "picked_up": {
+        "name": "Picked up"
+      },
+      "stock_suspended": {
+        "name": "Stock app suspended"
       }
     },
     "button": {
@@ -263,6 +271,14 @@
       },
       "last_key": {
         "name": "Last key"
+      },
+      "kiosk": {
+        "name": "Kiosk",
+        "state": {
+          "on": "On",
+          "off": "Off",
+          "paused": "Paused"
+        }
       }
     },
     "update": {

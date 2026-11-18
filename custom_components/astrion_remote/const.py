@@ -58,6 +58,13 @@ VOICE_AUDIO_TIMEOUT: Final = 10.0
 EVENT_BUTTON: Final = "astrion_remote_button"
 # Fired with {entry_id, version} whenever a remote's stored config changes (see config_events.py).
 EVENT_CONFIG_CHANGED: Final = "astrion_remote_config_changed"
+# Fired with {device_id, remote_id, state} when the remote is picked up / put down (app motion sensing).
+EVENT_MOTION: Final = "astrion_remote_motion"
+MOTION_STATES: Final = ("picked_up", "put_down")
+# tv.transport: how tv_key actions reach the TV. Apps that do not know a value fall back to auto.
+TV_TRANSPORTS: Final = ("auto", "atv", "controlfreak", "bluetooth")
+# Telemetry `kiosk` values.
+KIOSK_STATES: Final = ("on", "off", "paused")
 
 KEY_IDS: Final = (
     "back",

@@ -60,6 +60,30 @@ def _cmds(mqtt_mock):
     return [c.args for c in mqtt_mock.async_publish.call_args_list if c.args[0] == f"{BASE}/cmd"]
 
 
+async def test_new_telemetry_fields(hass, mqtt_mock, setup_entry):
+    """picked_up, kiosk and stock_suspended (app 0.6) map to entities; unknown kiosk values are dropped."""
+    async_fire_mqtt_message(hass, f"{BASE}/status", "online", retain=True)
+    async_fire_mqtt_message(
+        hass,
+        f"{BASE}/telemetry",
+        json.dumps({"picked_up": True, "kiosk": "paused", "stock_suspended": False, "update_error": None}),
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.astrion_remote_picked_up").state == STATE_ON
+    kiosk = hass.states.get("sensor.astrion_remote_kiosk")
+    assert kiosk.state == "paused"
+    assert kiosk.attributes["options"] == ["on", "off", "paused"]
+    assert hass.states.get("binary_sensor.astrion_remote_stock_app_suspended").state == STATE_OFF
+
+    async_fire_mqtt_message(
+        hass, f"{BASE}/telemetry", json.dumps({"picked_up": None, "kiosk": "weird", "stock_suspended": "on"})
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.astrion_remote_picked_up").state == STATE_UNAVAILABLE
+    assert hass.states.get("sensor.astrion_remote_kiosk").state == STATE_UNAVAILABLE
+    assert hass.states.get("binary_sensor.astrion_remote_stock_app_suspended").state == STATE_ON
+
+
 async def test_buttons_and_services(hass, mqtt_mock, setup_entry):
     """Buttons and services publish non-retained commands."""
     mqtt_mock.async_publish.reset_mock()

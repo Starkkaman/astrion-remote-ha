@@ -20,6 +20,7 @@ from .const import (
     SCHEMA_VERSION,
     THEME_MODES,
     TV_HOLD_MODES,
+    TV_TRANSPORTS,
     VOICE_TARGETS,
 )
 
@@ -262,6 +263,8 @@ TV_SCHEMA = vol.Schema(
             str, vol.Match(r"^[^#+]+$", msg="keytopic may not contain wildcards")
         ),
         vol.Optional("context_entity"): vol.Any(None, entity_id),
+        # No default: an absent transport means auto, and stored configs stay unchanged.
+        vol.Optional("transport"): vol.In(TV_TRANSPORTS),
     }
 )
 THEME_SCHEMA = vol.Schema(

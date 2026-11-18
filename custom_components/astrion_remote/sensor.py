@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AstrionConfigEntry
+from .const import KIOSK_STATES
 from .entity import AstrionTelemetryEntity
 
 
@@ -38,6 +39,14 @@ async def async_setup_entry(
                 category=EntityCategory.DIAGNOSTIC,
             ),
             AstrionSensor(hub, "last_key", "last_key"),
+            AstrionSensor(
+                hub,
+                "kiosk",
+                "kiosk",
+                device_class=SensorDeviceClass.ENUM,
+                options=list(KIOSK_STATES),
+                category=EntityCategory.DIAGNOSTIC,
+            ),
         ]
     )
 
@@ -45,8 +54,12 @@ async def async_setup_entry(
 class AstrionSensor(AstrionTelemetryEntity, SensorEntity):
     """A telemetry value."""
 
-    def __init__(self, hub, key, field, *, device_class=None, unit=None, state_class=None, category=None):
+    def __init__(
+        self, hub, key, field, *, device_class=None, unit=None, state_class=None, category=None, options=None
+    ):
         super().__init__(hub, key, field)
+        if options is not None:
+            self._attr_options = options
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class

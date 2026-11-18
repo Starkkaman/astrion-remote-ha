@@ -18,7 +18,7 @@ Python 3.14). Requires the core **MQTT** integration.
 | `status` | app → HA | yes (LWT) | `binary_sensor.*_connected`; `offline` makes telemetry entities unavailable |
 | `config` | HA → app | yes | full config JSON (`schema_version` 1) incl. computed `allow` |
 | `state/<entity_id>` | HA → app | yes | `{"s":state,"a":{subset}}`, ≤4 msg/s per entity, empty payload when no longer referenced |
-| `event` | app → HA | no | fires `astrion_remote_button` `{device_id, remote_id, key, gesture, ctx}` + device triggers |
+| `event` | app → HA | no | fires `astrion_remote_button` `{device_id, remote_id, key, gesture, ctx}` + device triggers; `{"key":"motion","gesture":"picked_up"\|"put_down"}` fires `astrion_remote_motion` instead (below) |
 | `call` | app → HA | no | executed only if allowlisted; refusals are logged at WARNING; no reply |
 | `cmd` | HA → app | no | `reload`, `page <id>`, `toast <text>`, `update <url> <sha256>` |
 | `telemetry` | app → HA | yes | sensors (see below) |
@@ -30,6 +30,21 @@ Python 3.14). Requires the core **MQTT** integration.
 
 Telemetry JSON (partial updates merge): `{"battery":87,"charging":true,"screen":true,"page":"now","app_version":"0.3.1","version_code":9,"update_state":"idle","wifi_rssi":-61,"last_key":"red","ts":...}`.
 Accepted aliases: `battery_level`, `version`, `rssi`, `screen_on`; booleans may be `true/false`, `on/off`, `1/0`.
+App 0.6 also sends `picked_up` (bool, null = motion sensing off), `kiosk` (`on`/`off`/`paused`), `stock_suspended`
+(bool) and `update_error`: they become `binary_sensor.*_picked_up`, `sensor.*_kiosk` (diagnostic, enum) and
+`binary_sensor.*_stock_app_suspended` (diagnostic).
+
+## Motion (pick up / put down)
+The app publishes `{"key":"motion","gesture":"picked_up"|"put_down","ts":...}` on `<base>/event`; HA fires
+`astrion_remote_motion` `{device_id, remote_id, state}` (`state` = `picked_up` / `put_down`), sets the "Picked up"
+binary sensor at once, and offers the device triggers **Picked up** / **Put down**. The motion settings (wake on
+pickup, sleep when put down, delay 3/5/10/20 s, sensitivity) live on the remote (Settings → Motion); they are not
+part of the config.
+
+## Key route (`tv.transport`)
+`tv.transport`: `auto` (default; absent = auto) | `atv` (Android TV Remote, direct) | `controlfreak` (MQTT) |
+`bluetooth`. Apps that do not know a value use `auto`; the remote's own Settings → Key route overrides it.
+Bluetooth slows the remote's Wi-Fi while connected.
 
 ## Allowlist
 Computed on every publish, never stored:
@@ -43,7 +58,8 @@ Computed on every publish, never stored:
   shortcut keys), each showing its tap action. Click a chip to set Tap / Double tap / Hold (TV key, Home Assistant
   action, go to page, event only, nothing, app command) and per-app overrides for values of `tv.context_entity`.
 - **Pages**: add, rename, reorder and delete pages; add/reorder/delete sections and edit them per type.
-- **YAML**: the whole config for import/export.
+- **YAML**: a **Remote** card (Key route = `tv.transport`, with the Bluetooth Wi-Fi warning) and the whole config
+  for import/export.
 - Changes are validated live; **Save** validates, stores in the entry options and republishes (same path as the
   options flow). The panel works even while MQTT is down; the config is published once the remote is set up.
 - If someone else saved in the meantime (another tab, a dashboard card), Save is refused and the footer shows

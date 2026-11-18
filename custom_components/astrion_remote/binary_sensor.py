@@ -1,4 +1,4 @@
-"""Charging, screen and connectivity binary sensors."""
+"""Charging, screen, picked-up, stock-suspended and connectivity binary sensors."""
 
 from __future__ import annotations
 
@@ -20,6 +20,10 @@ async def async_setup_entry(
         [
             AstrionTelemetryBinary(hub, "charging", "charging", BinarySensorDeviceClass.BATTERY_CHARGING),
             AstrionTelemetryBinary(hub, "screen", "screen", None),
+            AstrionTelemetryBinary(hub, "picked_up", "picked_up", BinarySensorDeviceClass.MOVING),
+            AstrionTelemetryBinary(
+                hub, "stock_suspended", "stock_suspended", None, category=EntityCategory.DIAGNOSTIC
+            ),
             AstrionConnectivity(hub, "connectivity"),
         ]
     )
@@ -28,9 +32,10 @@ async def async_setup_entry(
 class AstrionTelemetryBinary(AstrionTelemetryEntity, BinarySensorEntity):
     """Boolean telemetry value."""
 
-    def __init__(self, hub, key, field, device_class) -> None:
+    def __init__(self, hub, key, field, device_class, *, category=None) -> None:
         super().__init__(hub, key, field)
         self._attr_device_class = device_class
+        self._attr_entity_category = category
 
     @callback
     def _update_from_hub(self) -> None:

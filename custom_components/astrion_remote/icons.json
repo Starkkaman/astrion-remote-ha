@@ -1,7 +1,9 @@
 {
   "entity": {
     "binary_sensor": {
-      "screen": {"default": "mdi:monitor-off", "state": {"on": "mdi:monitor"}}
+      "screen": {"default": "mdi:monitor-off", "state": {"on": "mdi:monitor"}},
+      "picked_up": {"default": "mdi:hand-back-left-off", "state": {"on": "mdi:hand-back-left"}},
+      "stock_suspended": {"default": "mdi:application-cog"}
     },
     "button": {
       "reload_config": {"default": "mdi:reload"},
@@ -10,7 +12,8 @@
     "sensor": {
       "page": {"default": "mdi:book-open-page-variant"},
       "app_version": {"default": "mdi:tag"},
-      "last_key": {"default": "mdi:gesture-tap-button"}
+      "last_key": {"default": "mdi:gesture-tap-button"},
+      "kiosk": {"default": "mdi:lock", "state": {"off": "mdi:lock-open-variant", "paused": "mdi:lock-clock"}}
     }
   },
   "services": {

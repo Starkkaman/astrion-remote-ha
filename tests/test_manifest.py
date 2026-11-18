@@ -8,7 +8,7 @@ import yaml
 
 from homeassistant.loader import async_get_integration
 
-from custom_components.astrion_remote.const import ACTION_TYPES, DOMAIN, GESTURES, KEY_IDS
+from custom_components.astrion_remote.const import ACTION_TYPES, DOMAIN, GESTURES, KEY_IDS, MOTION_STATES
 
 ROOT = Path(__file__).parents[1] / "custom_components" / DOMAIN
 
@@ -56,11 +56,11 @@ def test_translations_match_strings():
     assert "user" in strings["config"]["step"]
     assert set(strings["selector"]["key"]["options"]) == set(KEY_IDS)
     assert set(strings["selector"]["action_type"]["options"]) == set(ACTION_TYPES)
-    assert set(strings["device_automation"]["trigger_type"]) == set(GESTURES)
+    assert set(strings["device_automation"]["trigger_type"]) == set(GESTURES) | set(MOTION_STATES)
     assert set(strings["device_automation"]["trigger_subtype"]) == set(KEY_IDS)
     for platform, keys in {
-        "sensor": {"battery", "page", "app_version", "wifi_rssi", "last_key"},
-        "binary_sensor": {"charging", "screen", "connectivity"},
+        "sensor": {"battery", "page", "app_version", "wifi_rssi", "last_key", "kiosk"},
+        "binary_sensor": {"charging", "screen", "connectivity", "picked_up", "stock_suspended"},
         "button": {"reload_config", "home_page"},
         "update": {"app"},
     }.items():

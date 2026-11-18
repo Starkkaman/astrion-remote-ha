@@ -41,6 +41,15 @@ const TV_HOLD_MODES = [
   ["none", "None (ignore hold)"],
 ];
 
+// tv.transport: how tv_key actions reach the TV. Absent = auto; apps that do not know a value use auto.
+const TV_TRANSPORTS = [
+  ["auto", "Auto (direct when paired, else Control Freak)"],
+  ["atv", "Android TV Remote (direct)"],
+  ["controlfreak", "Control Freak (MQTT)"],
+  ["bluetooth", "Bluetooth"],
+];
+const BLUETOOTH_WARNING = "Bluetooth slows the remote's Wi-Fi while connected.";
+
 const APP_CMDS = [
   ["settings", "Open settings"],
   ["reload", "Reload config"],
@@ -1608,6 +1617,29 @@ class AstrionRemotePanel extends HTMLElement {
   }
 
   // ---- YAML tab ----------------------------------------------------------------------------
+  // ---- Remote settings (YAML tab) ---------------------------------------------------------
+  _renderRemoteSettings() {
+    const current = this._config?.tv?.transport ?? "auto";
+    const warn = h("div", { class: "hint warn", hidden: current !== "bluetooth" }, BLUETOOTH_WARNING);
+    return this._card("Remote", [
+      h(
+        "p",
+        { class: "hint" },
+        "Key route: how TV keys reach the TV. The remote's own Settings → Key route overrides this; motion settings (wake on pickup, sleep when put down) are set on the remote."
+      ),
+      this._select(TV_TRANSPORTS, current, (v) => {
+        const tv = { ...(this._config.tv || {}) };
+        if (!v || v === "auto") delete tv.transport;
+        else tv.transport = v;
+        this._config = { ...this._config, tv };
+        warn.hidden = v !== "bluetooth";
+        this._touched();
+        if (this._yamlPending === undefined) this._renderYaml(); // keep the YAML view in step
+      }, { label: "Key route" }),
+      warn,
+    ]);
+  }
+
   _renderYaml() {
     const hasYaml = defined("ha-selector");
     const status = h("div", { class: "hint" });
@@ -1618,6 +1650,7 @@ class AstrionRemotePanel extends HTMLElement {
       }
     });
     this._bodyEl.replaceChildren(
+      this._renderRemoteSettings(),
       this._card(hasYaml ? "Config as YAML" : "Config as JSON", [
         h(
           "p",

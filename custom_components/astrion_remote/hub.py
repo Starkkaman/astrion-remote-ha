@@ -37,7 +37,10 @@ from .const import (
     DOMAIN,
     EVENT_BUTTON,
     EVENT_GESTURES,
+    EVENT_MOTION,
+    KIOSK_STATES,
     MIRRORED_ATTRIBUTES,
+    MOTION_STATES,
     SIGNAL_UPDATE,
     STATE_MIN_INTERVAL,
     TOPIC_CALL,
@@ -82,6 +85,10 @@ _TELEMETRY_ALIASES = {
     "version": "app_version",
     "version_code": "version_code",
     "update_state": "update_state",
+    "update_error": "update_error",
+    "picked_up": "picked_up",
+    "kiosk": "kiosk",
+    "stock_suspended": "stock_suspended",
     "wifi_rssi": "wifi_rssi",
     "rssi": "wifi_rssi",
     "last_key": "last_key",
@@ -437,6 +444,8 @@ class AstrionHub:
     @callback
     def _on_event(self, msg: mqtt.ReceiveMessage) -> None:
         data = self._json(msg)
+        if data is not None and self._motion_event(data):
+            return
         if data is None or not isinstance(data.get("key"), str) or data.get("gesture") not in EVENT_GESTURES:
             _LOGGER.debug("Astrion %s: ignoring malformed event %s", self.remote_id, msg.payload)
             return
@@ -452,6 +461,30 @@ class AstrionHub:
         )
 
     @callback
+    def _motion_event(self, data: dict[str, Any]) -> bool:
+        """Handle a motion event; True if `data` was one (valid or not).
+
+        The app sends {"key": "motion", "gesture": "picked_up"|"put_down", "ts"}; {"type": "motion",
+        "state": ...} is accepted too.
+        """
+        if data.get("key") == "motion":
+            state = data.get("gesture")
+        elif data.get("type") == "motion":
+            state = data.get("state")
+        else:
+            return False
+        if state not in MOTION_STATES:
+            _LOGGER.debug("Astrion %s: ignoring malformed motion event %s", self.remote_id, data)
+            return True
+        self.hass.bus.async_fire(
+            EVENT_MOTION, {"device_id": self.device_id, "remote_id": self.remote_id, "state": state}
+        )
+        # Reflect it right away; the telemetry publish that follows confirms it.
+        self.telemetry["picked_up"] = state == "picked_up"
+        async_dispatcher_send(self.hass, self.signal)
+        return True
+
+    @callback
     def _on_telemetry(self, msg: mqtt.ReceiveMessage) -> None:
         data = self._json(msg)
         if data is None:
@@ -460,7 +493,7 @@ class AstrionHub:
             canon = _TELEMETRY_ALIASES.get(key)
             if canon is None:
                 continue
-            if canon in ("charging", "screen"):
+            if canon in ("charging", "screen", "picked_up", "stock_suspended"):
                 value = _as_bool(value)
             elif canon in ("battery", "wifi_rssi", "version_code"):
                 try:
@@ -469,6 +502,8 @@ class AstrionHub:
                     value = None
             elif value is not None:
                 value = str(value)
+            if canon == "kiosk" and value not in KIOSK_STATES:
+                value = None
             self.telemetry[canon] = value
         if version := self.telemetry.get("app_version"):
             dev_reg = dr.async_get(self.hass)
