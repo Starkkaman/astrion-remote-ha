@@ -56,6 +56,8 @@ VOICE_TARGETS: Final = ("ha", "tv")
 VOICE_AUDIO_TIMEOUT: Final = 10.0
 
 EVENT_BUTTON: Final = "astrion_remote_button"
+# Fired with {entry_id, version} whenever a remote's stored config changes (see config_events.py).
+EVENT_CONFIG_CHANGED: Final = "astrion_remote_config_changed"
 
 KEY_IDS: Final = (
     "back",

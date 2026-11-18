@@ -72,7 +72,8 @@ async def test_validate_ok_and_errors(hass, mqtt_mock, setup_entry, hass_ws_clie
     msg = await _send(
         client, {"type": "astrion_remote/config/validate", "entry_id": setup_entry.entry_id, "config": good}
     )
-    assert msg["result"] == {"ok": True, "errors": []}
+    assert msg["result"]["ok"] is True
+    assert msg["result"]["errors"] == []
 
     bad = copy.deepcopy(good)
     bad["keys"]["sc1"] = {"tap": {"type": "ha", "action": "not an action"}}

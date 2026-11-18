@@ -22,6 +22,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from .apk import ApkDownloadView, ApkTokens
+from .config_events import async_track_config_changes
 from .const import (
     CONF_AUTO_INSTALL,
     CONF_BASE_URL,
@@ -114,7 +115,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register services, the APK download view, the panel's websocket API and static files."""
     tokens = ApkTokens()
     integration = await async_get_integration(hass, DOMAIN)
-    hass.data[DOMAIN] = {"tokens": tokens, "version": str(integration.version or "0")}
+    hass.data[DOMAIN] = {"tokens": tokens, "version": str(integration.version or "0"), "config_versions": {}}
+    async_track_config_changes(hass, hass.data[DOMAIN]["config_versions"])
     hass.http.register_view(ApkDownloadView(tokens))
     async_register_websocket(hass)
     await async_register_static(hass)

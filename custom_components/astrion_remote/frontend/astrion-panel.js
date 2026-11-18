@@ -210,6 +210,9 @@ class AstrionRemotePanel extends HTMLElement {
     this._selKey = "ok";
     this._selPage = 0;
     this._errors = [];
+    this._warnings = []; // non-blocking lint: [{path, msg}]
+    this._version = null; // version of the stored config this editor started from
+    this._stale = false; // a save was rejected because someone else saved first
     this._entries = [];
     this._entryId = null;
     this._config = null;
@@ -316,6 +319,9 @@ class AstrionRemotePanel extends HTMLElement {
       this._keys = arr(data?.keys);
       this._contexts = arr(data?.context_values).map(String);
       this._canUndo = !!data?.can_undo;
+      this._version = typeof data?.version === "string" ? data.version : null;
+      this._warnings = arr(data?.warnings);
+      this._stale = false;
       this._tvKeys = arr(tv?.keys).map(String);
       this._errors = [];
       this._yamlPending = undefined;
@@ -348,11 +354,13 @@ class AstrionRemotePanel extends HTMLElement {
         config: this._config,
       });
       this._errors = arr(res?.errors);
+      this._warnings = arr(res?.warnings);
     } catch (err) {
       this._errors = [{ path: [], msg: err?.message || String(err) }];
     }
     this._renderErrors();
     this._markErrors();
+    this._markWarnings();
     this._renderFooter();
     if (!quiet && this._errors.length) this._message = "";
     return this._errors.length === 0;
@@ -365,19 +373,24 @@ class AstrionRemotePanel extends HTMLElement {
     this._renderFooter();
     try {
       if (!(await this._validate(false))) return;
-      const res = await this._hass.callWS({
-        type: `${WS}/config/set`,
-        entry_id: this._entryId,
-        config: this._config,
-      });
+      const msg = { type: `${WS}/config/set`, entry_id: this._entryId, config: this._config };
+      if (this._version) msg.version = this._version;
+      const res = await this._hass.callWS(msg);
       this._config = isObj(res?.config) ? res.config : this._config;
       this._saved = JSON.stringify(this._config);
+      if (typeof res?.version === "string") this._version = res.version;
+      this._stale = false;
       this._message = "Saved and published";
       this._yamlPending = undefined;
       this._renderBody();
     } catch (err) {
-      this._errors = [{ path: [], msg: err?.message || String(err) }];
-      this._renderErrors();
+      if (err?.code === "stale_config") {
+        // Someone else (another tab, a dashboard card) saved since we loaded: nothing was stored.
+        this._stale = true;
+      } else {
+        this._errors = [{ path: [], msg: err?.message || String(err) }];
+        this._renderErrors();
+      }
     } finally {
       this._saving = false;
       this._renderFooter();
@@ -389,6 +402,8 @@ class AstrionRemotePanel extends HTMLElement {
     this._config = isObj(res?.config) ? res.config : this._config;
     this._saved = JSON.stringify(this._config);
     this._canUndo = !!res?.can_undo;
+    if (typeof res?.version === "string") this._version = res.version;
+    this._stale = false;
     this._errors = [];
     this._yamlPending = undefined;
     this._message = message;
@@ -540,6 +555,37 @@ class AstrionRemotePanel extends HTMLElement {
 
   _errorsAt(prefix) {
     return this._errors.filter((e) => prefix.every((p, i) => arr(e.path)[i] === p));
+  }
+
+  _warningsAt(prefix) {
+    return this._warnings.filter((w) => prefix.every((p, i) => arr(w.path)[i] === p));
+  }
+
+  /** Amber lint line(s) for everything under `prefix`; refreshed in place by _markWarnings. */
+  _warnSlot(prefix) {
+    const el = h("div", { class: "warn-slot", "@data-warn-path": JSON.stringify(prefix) });
+    this._fillWarnSlot(el, prefix);
+    return el;
+  }
+
+  _fillWarnSlot(el, prefix) {
+    el.replaceChildren(
+      ...this._warningsAt(prefix).map((w) => {
+        const rest = arr(w.path).slice(prefix.length).filter((p) => p !== "entity");
+        return h("div", { class: "warning-line" }, rest.length ? `${rest.join(" › ")}: ${w.msg}` : w.msg);
+      })
+    );
+  }
+
+  _markWarnings() {
+    for (const el of this.shadowRoot.querySelectorAll("[data-warn-path]")) {
+      this._fillWarnSlot(el, JSON.parse(el.dataset.warnPath));
+    }
+  }
+
+  async _reloadStale() {
+    if (this._dirty && !confirm("Reload the saved config? Your unsaved changes will be discarded.")) return;
+    await this._load(this._entryId);
   }
 
   // ---- generic controls --------------------------------------------------------------------
@@ -978,12 +1024,14 @@ class AstrionRemotePanel extends HTMLElement {
     let text = "";
     if (ready) {
       if (this._saving) text = "Saving…";
+      else if (this._stale) text = h("span", { class: "stale" }, "Changed elsewhere: Reload");
       else if (dirty) text = "Unsaved changes";
       else text = this._message || "All changes saved";
     }
     this._footerEl.classList.toggle("dirty", dirty);
     this._footerEl.replaceChildren(
       h("div", { class: "footer-text" }, text, this._errors.length && dirty ? h("span", { class: "err-count" }, ` · ${this._errors.length} problem(s)`) : null),
+      ready && this._stale ? this._button("Reload", () => this._reloadStale(), { disabled: !!this._saving }) : null,
       this._button("Revert", () => this._revert(), { disabled: !dirty || !!this._saving }),
       this._button("Save", () => this._save(), { primary: true, disabled: !dirty || !!this._saving })
     );
@@ -1135,7 +1183,11 @@ class AstrionRemotePanel extends HTMLElement {
 
     const ctxEntity = this._config?.tv?.context_entity;
     this._keyEditorEl.replaceChildren(
-      this._card(`${this._keyLabel(id)} key`, [h("div", { class: "gestures" }, this._gestureEditors(id, null))], "editor-card"),
+      this._card(
+        `${this._keyLabel(id)} key`,
+        [h("div", { class: "gestures" }, this._gestureEditors(id, null)), this._warnSlot(["keys", id])],
+        "editor-card"
+      ),
       this._card(
         "Per-app overrides",
         [
@@ -1429,7 +1481,7 @@ class AstrionRemotePanel extends HTMLElement {
     return h(
       "ha-card",
       { class: "section-card", "@data-path": JSON.stringify(path) },
-      h("div", { class: "card-content" }, header, ...body)
+      h("div", { class: "card-content" }, header, this._warnSlot(path), ...body)
     );
   }
 
@@ -1662,6 +1714,8 @@ ha-selector { display: block; margin: 8px 0; }
 .footer-text { flex: 1; color: var(--secondary-text-color); }
 .footer.dirty .footer-text { color: var(--primary-text-color); font-weight: 500; }
 .err-count { color: var(--error-color); }
+.stale { color: var(--warning-color); font-weight: 500; }
+.warning-line { color: var(--warning-color); font-size: 0.85em; margin: 4px 0; }
 /* buttons tab */
 .buttons-layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
 :host([narrow]) .buttons-layout, .narrow-layout { grid-template-columns: 1fr; }

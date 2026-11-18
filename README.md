@@ -46,9 +46,40 @@ Computed on every publish, never stored:
 - **YAML**: the whole config for import/export.
 - Changes are validated live; **Save** validates, stores in the entry options and republishes (same path as the
   options flow). The panel works even while MQTT is down; the config is published once the remote is set up.
-- Websocket API (admin): `astrion_remote/config/get`, `astrion_remote/config/validate`, `astrion_remote/config/set`
-  (`entry_id`, `config`), `astrion_remote/config/reset` (`entry_id`, `parts`), `astrion_remote/config/undo_reset`
-  (`entry_id`) and `astrion_remote/tv_keys`.
+- If someone else saved in the meantime (another tab, a dashboard card), Save is refused and the footer shows
+  "Changed elsewhere: Reload". Lint warnings (see below) show as an amber line under the key or section.
+
+## Websocket API (stable contract for the panel and dashboard cards)
+All commands are admin-only. `entry_id` is the Astrion Remote config entry; unknown ids fail with `not_found`.
+
+| Command | Request | Result |
+|---|---|---|
+| `astrion_remote/config/get` | `entry_id` | `config`, `version`, `schema_version`, `keys` (`[{id, label, group}]`), `context_values`, `can_undo`, `warnings` |
+| `astrion_remote/config/validate` | `entry_id`, `config` | `ok`, `errors` (`[{path, msg}]`), `warnings` (`[{path, msg}]`); stores nothing |
+| `astrion_remote/config/set` | `entry_id`, `config`, optional `version` | `config` (as stored, normalised), `version` |
+| `astrion_remote/config/reset` | `entry_id`, `parts` (any of `pages`, `keys`, `timings`, `theme`; default `["pages"]`) | `config`, `version`, `can_undo` |
+| `astrion_remote/config/undo_reset` | `entry_id` | `config`, `version`, `can_undo` |
+| `astrion_remote/tv_keys` | | `keys` (TV key names for pickers) |
+
+**Version / optimistic concurrency.** `version` is the first 16 hex digits of the sha256 of the stored config's
+canonical JSON (keys sorted, no whitespace); the same content always has the same version. Send the `version` you
+loaded with `config/set`: if the stored config has changed since, the save fails with error code `stale_config`
+("Someone else saved the remote config; reload and try again") and nothing is stored or published; reload with
+`config/get` and reapply. Without `version` the save is last-write-wins (pre-0.6 behaviour). An invalid config
+fails with `invalid_format` (call `config/validate` first for per-path errors).
+
+**Event `astrion_remote_config_changed`** `{entry_id, version}` is fired on the HA event bus whenever an entry's
+stored config changes, by any path: `config/set`, reset, undo, the services and the options flow (a save that
+changes nothing fires nothing). Dashboard cards can subscribe (`subscribe_events` with that `event_type`) and
+re-fetch with `config/get` when `version` differs from theirs.
+
+**Warnings** are non-blocking hints (a config with warnings still saves), each `{path, msg}` like `errors`:
+- an `ha` action calling a service that needs a target (HA's service description declares a target selector or an
+  `entity_id` field; if HA has no description: `scene.turn_on`, `script.turn_on`, `light.*`, `switch.*`,
+  `media_player.*`, `select.*`, `input_select.*` except `reload`) with no `target.entity_id` and no
+  `data.entity_id`; `path` is the action, e.g. `["keys", "sc1", "tap"]`;
+- a `segmented` / `slider` / `rocker` / `switch` section or a `choose` action whose entity is not in
+  `hass.states`; `path` ends in `"entity"`, e.g. `["pages", 0, "sections", 2, "entity"]`.
 
 ## Options (Configure)
 The options flow stays available as a fallback editor.

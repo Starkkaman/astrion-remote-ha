@@ -175,6 +175,7 @@ async def test_ws_reset_keys_and_undo(hass, mqtt_mock, setup_entry, hass_ws_clie
 
     msg = await _send(client, {"type": "astrion_remote/config/undo_reset", "entry_id": eid})
     assert msg["success"], msg
+    assert msg["result"].pop("version")
     assert msg["result"] == {"config": json.loads(json.dumps(mine)), "can_undo": False}
     assert setup_entry.options[CONF_CONFIG] == mine
 

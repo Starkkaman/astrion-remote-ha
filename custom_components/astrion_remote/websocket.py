@@ -1,4 +1,8 @@
-"""Admin-only websocket API used by the "Astrion Remote" sidebar panel."""
+"""Admin-only websocket API used by the "Astrion Remote" sidebar panel and dashboard cards.
+
+A stable contract (documented in the README): every stored-config response carries `version`;
+config/set accepts the `version` it started from and rejects with `stale_config` on mismatch.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +19,7 @@ from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
+from .config_events import config_version
 from .const import (
     CONF_CONFIG,
     DOMAIN,
@@ -27,6 +32,7 @@ from .const import (
     TV_KEYS,
 )
 from .default_config import DEFAULT_CONFIG
+from .lint import async_lint
 from .reset import ResetError, async_reset, async_undo_reset, has_previous
 from .schema import validate_config
 
@@ -38,6 +44,9 @@ CONTEXT_HISTORY_LIMIT = 2000
 CONTEXT_MAX_VALUES = 50
 
 _ENTRY = {vol.Required("entry_id"): str}
+
+ERR_STALE_CONFIG = "stale_config"
+STALE_CONFIG_MSG = "Someone else saved the remote config; reload and try again"
 
 
 @callback
@@ -194,14 +203,17 @@ async def ws_config_get(
     if (entry := _get_entry(hass, connection, msg)) is None:
         return
     config = _stored_config(entry)
+    version = config_version(config)
     connection.send_result(
         msg["id"],
         {
             "config": config,
+            "version": version,
             "schema_version": SCHEMA_VERSION,
             "keys": _key_list(),
             "context_values": await _context_values(hass, config),
             "can_undo": has_previous(entry),
+            "warnings": await async_lint(hass, config, _iter_action_paths(config)),
         },
     )
 
@@ -210,19 +222,27 @@ async def ws_config_get(
     {vol.Required("type"): "astrion_remote/config/validate", **_ENTRY, vol.Required("config"): dict}
 )
 @websocket_api.require_admin
-@callback
-def ws_config_validate(
+@websocket_api.async_response
+async def ws_config_validate(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Validate a config without storing it."""
+    """Validate a config without storing it; warnings never block a save."""
     if _get_entry(hass, connection, msg) is None:
         return
-    _, errors = _validate(msg["config"])
-    connection.send_result(msg["id"], {"ok": not errors, "errors": errors})
+    config, errors = _validate(msg["config"])
+    linted = config if config is not None else msg["config"]
+    warnings = await async_lint(hass, linted, _iter_action_paths(linted))
+    connection.send_result(msg["id"], {"ok": not errors, "errors": errors, "warnings": warnings})
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): "astrion_remote/config/set", **_ENTRY, vol.Required("config"): dict}
+    {
+        vol.Required("type"): "astrion_remote/config/set",
+        **_ENTRY,
+        vol.Required("config"): dict,
+        # The version the editor loaded; omitted = last write wins (pre-0.6 clients).
+        vol.Optional("version"): str,
+    }
 )
 @websocket_api.require_admin
 @websocket_api.async_response
@@ -231,6 +251,10 @@ async def ws_config_set(
 ) -> None:
     """Validate, store in the entry options and publish (same path as the options flow)."""
     if (entry := _get_entry(hass, connection, msg)) is None:
+        return
+    # No await between this check and the store below, so two saves cannot interleave.
+    if "version" in msg and msg["version"] != config_version(_stored_config(entry)):
+        connection.send_error(msg["id"], ERR_STALE_CONFIG, STALE_CONFIG_MSG)
         return
     config, errors = _validate(msg["config"])
     if config is None:
@@ -241,7 +265,7 @@ async def ws_config_set(
     # The update listener republishes on change; an unchanged save still republishes (explicit "Save").
     if not changed and entry.state is ConfigEntryState.LOADED:
         await entry.runtime_data.async_apply_options()
-    connection.send_result(msg["id"], {"config": copy.deepcopy(config)})
+    connection.send_result(msg["id"], {"config": copy.deepcopy(config), "version": config_version(config)})
 
 
 @websocket_api.websocket_command(
@@ -264,7 +288,9 @@ async def ws_config_reset(
     except ResetError as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
-    connection.send_result(msg["id"], {"config": config, "can_undo": has_previous(entry)})
+    connection.send_result(
+        msg["id"], {"config": config, "version": config_version(config), "can_undo": has_previous(entry)}
+    )
 
 
 @websocket_api.websocket_command({vol.Required("type"): "astrion_remote/config/undo_reset", **_ENTRY})
@@ -281,7 +307,9 @@ async def ws_config_undo_reset(
     except ResetError as err:
         connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, str(err))
         return
-    connection.send_result(msg["id"], {"config": config, "can_undo": has_previous(entry)})
+    connection.send_result(
+        msg["id"], {"config": config, "version": config_version(config), "can_undo": has_previous(entry)}
+    )
 
 
 def _errors_text(errors: list[dict[str, Any]]) -> str:
