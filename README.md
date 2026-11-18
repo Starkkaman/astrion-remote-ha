@@ -28,7 +28,7 @@ Python 3.14). Requires the core **MQTT** integration.
 | `voice/stop` | HA → app | no | `{"run"}`: HA stopped listening (VAD end) |
 | `voice/event` | HA → app | no | `{"run","stage":"listening/processing/responding/done/error","text"?,"tts_url"?,"error"?}` |
 
-Telemetry JSON (partial updates merge): `{"battery":87,"charging":true,"screen":true,"page":"now","app_version":"0.3.1","wifi_rssi":-61,"last_key":"red","ts":...}`.
+Telemetry JSON (partial updates merge): `{"battery":87,"charging":true,"screen":true,"page":"now","app_version":"0.3.1","version_code":9,"update_state":"idle","wifi_rssi":-61,"last_key":"red","ts":...}`.
 Accepted aliases: `battery_level`, `version`, `rssi`, `screen_on`; booleans may be `true/false`, `on/off`, `1/0`.
 
 ## Allowlist
@@ -55,13 +55,23 @@ The options flow stays available as a fallback editor.
 
 - **Keys**: key → gesture (tap/double/hold) → action type; `ha` uses the action selector (hold: optional *repeat*).
 - **Pages**: YAML editor, validated against the section schema.
-- **Timings & theme**: hold/double/keepalive ms, theme, calm, TV key topic, context entity, APK sub directory,
-  Home Assistant URL reachable from the remote (`base_url`, default `http://192.168.5.166:8123`).
+- **Timings & theme**: hold/double/keepalive ms, theme, calm, TV key topic, context entity, app update source
+  (`github`/`folder`), GitHub repository, auto-install, APK sub directory, Home Assistant URL reachable from the remote (`base_url`, default `http://192.168.5.166:8123`).
 - **Import/export**: the whole config as YAML (`allow` is ignored on import and recomputed).
 Every change republishes `config` (retained) and resyncs the state mirror without reloading the entry.
 
 ## App updates
-Put `astrion-<version>.apk` plus `astrion-<version>.apk.sha256` (or `astrion-<version>.sha256`; `sha256sum` output is fine)
+**GitHub (default source).** The update entity lists `GET /repos/<github_repo>/releases?per_page=20` every 6 hours and
+on demand (`homeassistant.update_entity`), unauthenticated, with `If-None-Match` (ETag); on the 60/hour rate limit it
+waits for `X-RateLimit-Reset` / `Retry-After` and keeps the last listing. It uses releases tagged `app-v*` (prereleases
+included; drafts and other tags ignored) with an asset `astrion-<versionName>-<versionCode>.apk` **and** a matching
+`.apk.sha256` asset; the highest versionCode wins. Versions show as `<name> (<code>)` and compare by versionCode (the
+remote's telemetry `version_code`). Install downloads the APK to `/config/astrion_remote/`, checks it against the
+`.sha256` asset, then continues as below. With **auto-install** on, a newer release is sent once per versionCode as soon
+as the remote is online and idle. App releases are published by the app repo's `scripts/release-apk.sh` as
+prereleases that are never "Latest", so HACS keeps offering only the integration's own releases.
+
+**Folder.** Put `astrion-<version>.apk` plus `astrion-<version>.apk.sha256` (or `astrion-<version>.sha256`; `sha256sum` output is fine)
 in `/config/astrion_remote/` (or the configured sub directory). Install verifies the file hash, issues a one-time URL
 `<base_url>/api/astrion_remote/apk/<32-byte token>` (one download, 10 minutes) and publishes `update <url> <sha256>`.
 `base_url` is the *Home Assistant URL reachable from the remote* option (Timings & theme; `http(s)://host[:port]`, no

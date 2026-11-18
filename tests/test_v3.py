@@ -259,7 +259,7 @@ async def test_entry_migration_1_3_to_1_4(hass, mqtt_mock, edited):
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     stored = entry.options[CONF_CONFIG]
     assert stored["theme"]["mode"] == "auto"
     assert stored["keys"]["red"]["tap"]["type"] == "choose"

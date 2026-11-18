@@ -24,10 +24,16 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_APK_DIR,
-    CONF_BASE_URL,
+    CONF_AUTO_INSTALL,
     CONF_BASE_TOPIC,
+    CONF_BASE_URL,
     CONF_CONFIG,
     CONF_DEVICE_ID,
+    CONF_GITHUB_REPO,
+    CONF_UPDATE_SOURCE,
+    DEFAULT_AUTO_INSTALL,
+    DEFAULT_GITHUB_REPO,
+    DEFAULT_UPDATE_SOURCE,
     DOMAIN,
     EVENT_BUTTON,
     EVENT_GESTURES,
@@ -46,6 +52,7 @@ from .const import (
     TOPIC_VOICE_EVENT,
     TOPIC_VOICE_START,
     TOPIC_VOICE_STOP,
+    UPDATE_SOURCES,
     VOICE_RATE,
 )
 from .default_config import DEFAULT_CONFIG
@@ -73,6 +80,8 @@ _TELEMETRY_ALIASES = {
     "page": "page",
     "app_version": "app_version",
     "version": "app_version",
+    "version_code": "version_code",
+    "update_state": "update_state",
     "wifi_rssi": "wifi_rssi",
     "rssi": "wifi_rssi",
     "last_key": "last_key",
@@ -152,6 +161,22 @@ class AstrionHub:
     def apk_subdir(self) -> str:
         """Configured APK sub directory (relative to /config/astrion_remote)."""
         return self.entry.options.get(CONF_APK_DIR, "") or ""
+
+    @property
+    def update_source(self) -> str:
+        """`github` or `folder`."""
+        source = self.entry.options.get(CONF_UPDATE_SOURCE) or DEFAULT_UPDATE_SOURCE
+        return source if source in UPDATE_SOURCES else DEFAULT_UPDATE_SOURCE
+
+    @property
+    def github_repo(self) -> str:
+        """`owner/name` holding the app-v* releases."""
+        return (self.entry.options.get(CONF_GITHUB_REPO) or DEFAULT_GITHUB_REPO).strip()
+
+    @property
+    def auto_install(self) -> bool:
+        """Install a newer GitHub APK by itself while the remote is online."""
+        return bool(self.entry.options.get(CONF_AUTO_INSTALL, DEFAULT_AUTO_INSTALL))
 
     @property
     def base_url(self) -> str:
@@ -437,7 +462,7 @@ class AstrionHub:
                 continue
             if canon in ("charging", "screen"):
                 value = _as_bool(value)
-            elif canon in ("battery", "wifi_rssi"):
+            elif canon in ("battery", "wifi_rssi", "version_code"):
                 try:
                     value = int(value)
                 except (TypeError, ValueError):

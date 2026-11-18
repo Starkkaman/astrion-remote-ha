@@ -11,6 +11,10 @@ CONF_BASE_TOPIC: Final = "base_topic"
 CONF_CONFIG: Final = "config"
 CONF_APK_DIR: Final = "apk_dir"
 CONF_BASE_URL: Final = "base_url"
+# App updates: where APKs come from (GitHub releases or the APK folder), which repo, and auto-install.
+CONF_UPDATE_SOURCE: Final = "update_source"
+CONF_GITHUB_REPO: Final = "github_repo"
+CONF_AUTO_INSTALL: Final = "auto_install"
 # Options: the config as it was before the last reset_to_defaults (one-step undo).
 CONF_PREVIOUS_CONFIG: Final = "previous_config"
 
@@ -19,7 +23,15 @@ DEFAULT_BASE_TOPIC: Final = "astrion/ha100"
 # HA URL the remote uses to download APKs (empty = HA's own internal URL).
 DEFAULT_BASE_URL: Final = "http://192.168.5.166:8123"
 
-# Directory (under the HA config dir) that holds astrion-<version>.apk files.
+UPDATE_SOURCE_GITHUB: Final = "github"
+UPDATE_SOURCE_FOLDER: Final = "folder"
+UPDATE_SOURCES: Final = (UPDATE_SOURCE_GITHUB, UPDATE_SOURCE_FOLDER)
+DEFAULT_UPDATE_SOURCE: Final = UPDATE_SOURCE_GITHUB
+DEFAULT_GITHUB_REPO: Final = "Starkkaman/astrion-remote-ha"
+DEFAULT_AUTO_INSTALL: Final = False
+
+# Directory (under the HA config dir) that holds astrion-<version>.apk files (folder source), and where
+# APKs downloaded from GitHub are kept.
 APK_ROOT_DIRNAME: Final = "astrion_remote"
 
 SCHEMA_VERSION: Final = 1
@@ -207,6 +219,11 @@ STATE_MIN_INTERVAL: Final = 0.25
 
 APK_TOKEN_TTL: Final = 600  # seconds
 APK_VIEW_URL: Final = "/api/astrion_remote/apk/{token}"
+MAX_APK_BYTES: Final = 100 * 1024 * 1024  # same cap as the app's updater
+
+GITHUB_API: Final = "https://api.github.com"
+GITHUB_PER_PAGE: Final = 20
+GITHUB_POLL_HOURS: Final = 6
 
 SIGNAL_UPDATE: Final = "astrion_remote_update_{}"
 

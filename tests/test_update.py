@@ -15,7 +15,7 @@ from homeassistant.helpers.network import NoURLAvailableError
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_mqtt_message
 
 from custom_components.astrion_remote.apk import ApkTokens, validate_base_url
-from custom_components.astrion_remote.const import CONF_BASE_URL, DEFAULT_BASE_URL
+from custom_components.astrion_remote.const import CONF_BASE_URL, CONF_UPDATE_SOURCE, DEFAULT_BASE_URL
 
 from .conftest import BASE
 
@@ -41,15 +41,21 @@ def base_url_option() -> str | None:
 
 @pytest.fixture
 def config_entry(config_entry, base_url_option):
-    """The shared entry, with base_url set when the test asks for it."""
+    """The shared entry on the folder source, with base_url set when the test asks for it."""
     if base_url_option is None:
-        return config_entry
+        return MockConfigEntry(
+            domain=config_entry.domain,
+            title=config_entry.title,
+            unique_id=config_entry.unique_id,
+            data=dict(config_entry.data),
+            options={**config_entry.options, CONF_UPDATE_SOURCE: "folder"},
+        )
     return MockConfigEntry(
         domain=config_entry.domain,
         title=config_entry.title,
         unique_id=config_entry.unique_id,
         data=dict(config_entry.data),
-        options={**config_entry.options, CONF_BASE_URL: base_url_option},
+        options={**config_entry.options, CONF_BASE_URL: base_url_option, CONF_UPDATE_SOURCE: "folder"},
         minor_version=2,
     )
 
@@ -82,8 +88,9 @@ async def _install_url(hass, mqtt_mock) -> str:
 
 async def test_base_url_migrated_to_default(hass, mqtt_mock, config_entry, apk_setup):
     """An entry without base_url (0.1.0) is migrated to the default option."""
-    assert config_entry.minor_version == 4
+    assert config_entry.minor_version == 5
     assert config_entry.options[CONF_BASE_URL] == DEFAULT_BASE_URL == "http://192.168.5.166:8123"
+    assert config_entry.options[CONF_UPDATE_SOURCE] == "folder"  # an existing choice is kept
 
 
 @pytest.mark.parametrize("base_url_option", ["http://10.0.0.7:8123/"])

@@ -51,7 +51,7 @@ async def test_untouched_install_migrates_to_new_pages(hass, mqtt_mock, fixture,
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     stored = entry.options[CONF_CONFIG]
     assert stored["pages"] == DEFAULT_CONFIG["pages"]
     assert stored["keys"]["voice"] == DEFAULT_CONFIG["keys"]["voice"]

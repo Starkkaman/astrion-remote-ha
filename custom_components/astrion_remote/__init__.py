@@ -23,9 +23,15 @@ from homeassistant.loader import async_get_integration
 
 from .apk import ApkDownloadView, ApkTokens
 from .const import (
+    CONF_AUTO_INSTALL,
     CONF_BASE_URL,
     CONF_CONFIG,
+    CONF_GITHUB_REPO,
+    CONF_UPDATE_SOURCE,
+    DEFAULT_AUTO_INSTALL,
     DEFAULT_BASE_URL,
+    DEFAULT_GITHUB_REPO,
+    DEFAULT_UPDATE_SOURCE,
     DOMAIN,
     RESET_PARTS,
     SERVICE_PAGE,
@@ -208,6 +214,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: AstrionConfigEntry) ->
     1.2 -> 1.3: voice key tap/hold -> voice ha/tv, if it is still the old default.
 
     1.3 -> 1.4: v3 defaults (choose on colour keys, new pages), only where still the 0.3.0 default.
+
+    1.4 -> 1.5: app update options (update_source, github_repo, auto_install) with their defaults; every
+    existing option is kept as is.
     """
     if entry.version > 1:
         return False
@@ -229,6 +238,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: AstrionConfigEntry) ->
         ) is not None:
             options[CONF_CONFIG] = migrated
         hass.config_entries.async_update_entry(entry, options=options, minor_version=4)
+    if entry.version == 1 and entry.minor_version < 5:
+        options = dict(entry.options)
+        options.setdefault(CONF_UPDATE_SOURCE, DEFAULT_UPDATE_SOURCE)
+        options.setdefault(CONF_GITHUB_REPO, DEFAULT_GITHUB_REPO)
+        options.setdefault(CONF_AUTO_INSTALL, DEFAULT_AUTO_INSTALL)
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=5)
     return True
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -33,6 +35,16 @@ async def hass(hass):
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations in every test."""
     return
+
+
+GITHUB_RE = re.compile(r"^https://api\.github\.com/")
+
+
+@pytest.fixture(autouse=True)
+def github_api(aioclient_mock):
+    """The update entity lists GitHub releases (default source): answer with no releases, never the network."""
+    aioclient_mock.get(GITHUB_RE, json=[])
+    return aioclient_mock
 
 
 @pytest.fixture

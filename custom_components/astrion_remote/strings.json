@@ -91,12 +91,18 @@
           "keytopic": "TV key topic",
           "context_entity": "TV context entity",
           "apk_dir": "APK sub directory",
-          "base_url": "Home Assistant URL reachable from the remote"
+          "base_url": "Home Assistant URL reachable from the remote",
+          "update_source": "App update source",
+          "github_repo": "GitHub repository",
+          "auto_install": "Install app updates automatically"
         },
         "data_description": {
           "apk_dir": "Folder under /config/astrion_remote/ holding astrion-<version>.apk and its .sha256. Empty = that folder itself.",
           "base_url": "Used for the one-time APK download link, e.g. http://192.168.5.166:8123 (no path). Empty = Home Assistant's internal URL.",
-          "context_entity": "Entity whose state picks key contexts (current TV app)."
+          "context_entity": "Entity whose state picks key contexts (current TV app).",
+          "update_source": "GitHub: signed APKs attached to app-v* releases (checked every 6 hours). Folder: APKs you put in /config/astrion_remote/.",
+          "github_repo": "owner/name of the public repository with the app-v* releases.",
+          "auto_install": "GitHub source only: when a newer APK appears and the remote is online, send it to the remote without asking."
         }
       },
       "yaml": {
@@ -114,7 +120,8 @@
       "invalid_config": "The config does not match the schema.",
       "invalid_apk_dir": "Use a relative folder without '..'.",
       "invalid_base_url": "Use http(s)://host[:port] without a path.",
-      "invalid_timings": "Invalid values."
+      "invalid_timings": "Invalid values.",
+      "invalid_github_repo": "Use owner/name, e.g. Starkkaman/astrion-remote-ha."
     }
   },
   "selector": {
@@ -180,6 +187,12 @@
         "auto": "Auto",
         "day": "Day",
         "night": "Night"
+      }
+    },
+    "update_source": {
+      "options": {
+        "github": "GitHub releases",
+        "folder": "APK folder"
       }
     }
   },

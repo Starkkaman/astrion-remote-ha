@@ -405,7 +405,7 @@ async def test_entry_migration(hass, mqtt_mock, voice, expected):
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     want = voice if expected == "keep" else DEFAULT_CONFIG["keys"]["voice"]
     assert entry.options[CONF_CONFIG]["keys"]["voice"] == want
     assert entry.options[CONF_BASE_URL] == DEFAULT_BASE_URL

@@ -15,22 +15,30 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector as sel
 
 from .apk import validate_base_url, validate_subdir
+from .github import validate_repo
 from .const import (
     ACTION_TYPES,
     APP_CMDS,
     CONF_APK_DIR,
+    CONF_AUTO_INSTALL,
     CONF_BASE_URL,
     CONF_BASE_TOPIC,
     CONF_CONFIG,
     CONF_DEVICE_ID,
+    CONF_GITHUB_REPO,
+    CONF_UPDATE_SOURCE,
+    DEFAULT_AUTO_INSTALL,
     DEFAULT_BASE_TOPIC,
     DEFAULT_BASE_URL,
     DEFAULT_DEVICE_ID,
+    DEFAULT_GITHUB_REPO,
+    DEFAULT_UPDATE_SOURCE,
     DOMAIN,
     GESTURES,
     KEY_IDS,
     THEME_MODES,
     TV_HOLD_MODES,
+    UPDATE_SOURCES,
 )
 from .default_config import DEFAULT_CONFIG
 from .schema import ACTION, validate_config, validate_pages
@@ -53,7 +61,7 @@ class AstrionConfigFlow(ConfigFlow, domain=DOMAIN):
     """One entry per remote."""
 
     VERSION = 1
-    MINOR_VERSION = 4
+    MINOR_VERSION = 5
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Ask for the device id and base topic."""
@@ -78,6 +86,9 @@ class AstrionConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_CONFIG: validate_config(DEFAULT_CONFIG),
                         CONF_APK_DIR: "",
                         CONF_BASE_URL: DEFAULT_BASE_URL,
+                        CONF_UPDATE_SOURCE: DEFAULT_UPDATE_SOURCE,
+                        CONF_GITHUB_REPO: DEFAULT_GITHUB_REPO,
+                        CONF_AUTO_INSTALL: DEFAULT_AUTO_INSTALL,
                     },
                 )
         schema = vol.Schema(
@@ -259,7 +270,7 @@ class AstrionOptionsFlow(OptionsFlow):
 
     # ---- timings & theme ---------------------------------------------------------------------
     async def async_step_timings(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Timings, theme, TV, APK directory and the HA URL for APK downloads."""
+        """Timings, theme, TV, app updates (source, repo, auto-install, APK directory) and the HA URL."""
         errors: dict[str, str] = {}
         config = self._config
         if user_input is not None:
@@ -276,9 +287,22 @@ class AstrionOptionsFlow(OptionsFlow):
                 base_url = validate_base_url(user_input.get(CONF_BASE_URL, ""))
             except ValueError:
                 errors[CONF_BASE_URL] = "invalid_base_url"
+            try:
+                github_repo = validate_repo(user_input.get(CONF_GITHUB_REPO) or DEFAULT_GITHUB_REPO)
+            except ValueError:
+                errors[CONF_GITHUB_REPO] = "invalid_github_repo"
             if not errors:
                 try:
-                    return self._save(config, **{CONF_APK_DIR: apk_dir, CONF_BASE_URL: base_url})
+                    return self._save(
+                        config,
+                        **{
+                            CONF_APK_DIR: apk_dir,
+                            CONF_BASE_URL: base_url,
+                            CONF_UPDATE_SOURCE: user_input.get(CONF_UPDATE_SOURCE, DEFAULT_UPDATE_SOURCE),
+                            CONF_GITHUB_REPO: github_repo,
+                            CONF_AUTO_INSTALL: bool(user_input.get(CONF_AUTO_INSTALL, DEFAULT_AUTO_INSTALL)),
+                        },
+                    )
                 except vol.Invalid:
                     errors["base"] = "invalid_timings"
         timings = config.get("timings", {})
@@ -308,6 +332,16 @@ class AstrionOptionsFlow(OptionsFlow):
             fields[vol.Optional("context_entity", default=tv["context_entity"])] = sel.EntitySelector()
         else:
             fields[vol.Optional("context_entity")] = sel.EntitySelector()
+        options = self.config_entry.options
+        fields[vol.Required(CONF_UPDATE_SOURCE, default=options.get(CONF_UPDATE_SOURCE, DEFAULT_UPDATE_SOURCE))] = (
+            _select(UPDATE_SOURCES, "update_source", sel.SelectSelectorMode.LIST)
+        )
+        fields[vol.Optional(CONF_GITHUB_REPO, default=options.get(CONF_GITHUB_REPO, DEFAULT_GITHUB_REPO))] = (
+            sel.TextSelector()
+        )
+        fields[vol.Required(CONF_AUTO_INSTALL, default=options.get(CONF_AUTO_INSTALL, DEFAULT_AUTO_INSTALL))] = (
+            sel.BooleanSelector()
+        )
         fields[vol.Optional(CONF_APK_DIR, default=self.config_entry.options.get(CONF_APK_DIR, ""))] = (
             sel.TextSelector()
         )
