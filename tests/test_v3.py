@@ -146,6 +146,16 @@ def test_visible_if_entity_mirrored():
     assert not [a for a in compute_allowlist(config) if a.endswith(":sensor.cond")]
 
 
+def test_tv_power_entity_is_accepted_and_mirrored():
+    """tv.power_entity (t39): the app reads its on/off to decide on a Bluetooth wake."""
+    config = validate_config({"tv": {"power_entity": "switch.tv_power"}, "pages": [{"id": "p", "title": "P", "sections": []}]})
+    assert config["tv"]["power_entity"] == "switch.tv_power"
+    assert "switch.tv_power" in referenced_entities(config)
+    assert not [a for a in compute_allowlist(config) if a.endswith(":switch.tv_power")]
+    assert validate_config({"tv": {"power_entity": None}, "pages": [{"id": "p", "title": "P", "sections": []}]})["tv"]["power_entity"] is None
+
+
+
 def test_rocker_allows_turn_on_with_data():
     from custom_components.astrion_remote.schema import is_call_allowed
 

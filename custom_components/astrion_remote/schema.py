@@ -263,6 +263,9 @@ TV_SCHEMA = vol.Schema(
             str, vol.Match(r"^[^#+]+$", msg="keytopic may not contain wildcards")
         ),
         vol.Optional("context_entity"): vol.Any(None, entity_id),
+        # The app reads this entity's mirrored on/off to tell a sleeping TV (Bluetooth wake) from an awake one.
+        # No default here: the app defaults to switch.hisense_tv_power and stored configs stay unchanged.
+        vol.Optional("power_entity"): vol.Any(None, entity_id),
         # No default: an absent transport means auto, and stored configs stay unchanged.
         vol.Optional("transport"): vol.In(TV_TRANSPORTS),
     }
@@ -411,7 +414,7 @@ def compute_allowlist(config: dict[str, Any]) -> list[str]:
 
 
 def referenced_entities(config: dict[str, Any]) -> set[str]:
-    """Entities whose state is mirrored: section/tile entities, action targets, context entity."""
+    """Entities whose state is mirrored: section/tile entities, action targets, context and power entities."""
     found: set[str] = set()
     for action in iter_actions(config):
         if action["type"] == "ha":
@@ -427,10 +430,14 @@ def referenced_entities(config: dict[str, Any]) -> set[str]:
             for item in section.get("items", []):
                 if "entity" in item:
                     found.add(item["entity"])
-    ctx = config.get("tv", {}).get("context_entity")
-    if ctx:
-        found.add(ctx)
+    tv = config.get("tv", {})
+    if ent := tv.get("context_entity"):
+        found.add(ent)
+    # The app defaults power_entity to switch.hisense_tv_power, so mirror that when unset.
+    if ent := tv.get("power_entity", "switch.hisense_tv_power"):
+        found.add(ent)
     return found
+
 
 
 def build_published_config(config: dict[str, Any]) -> dict[str, Any]:
