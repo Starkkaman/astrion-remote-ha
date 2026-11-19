@@ -24,6 +24,8 @@ from .const import (
     CONF_CONFIG,
     DOMAIN,
     GESTURES,
+    HISENSE_IR,
+    HISENSE_IR_ADDRESS,
     KEY_GROUPS,
     KEY_IDS,
     KEY_LABELS,
@@ -320,5 +322,9 @@ def _errors_text(errors: list[dict[str, Any]]) -> str:
 @websocket_api.require_admin
 @callback
 def ws_tv_keys(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-    """TV key names offered in the panel's picker (free text is accepted too)."""
-    connection.send_result(msg["id"], {"keys": list(TV_KEYS)})
+    """TV key names offered in the panel's picker (free text is accepted too), plus the Hisense IR codes."""
+    ir_codes = [
+        {"name": name, "protocol": "nec", "address": f"0x{HISENSE_IR_ADDRESS:04X}", "command": f"0x{cmd:02X}"}
+        for name, cmd in HISENSE_IR
+    ]
+    connection.send_result(msg["id"], {"keys": list(TV_KEYS), "ir_codes": ir_codes})

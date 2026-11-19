@@ -19,6 +19,7 @@ const ACTION_TYPES = [
   ["app", "App command"],
   ["voice", "Voice"],
   ["choose", "Choose from list"],
+  ["ir", "IR code"],
 ];
 
 const CHOOSE_DOMAINS = ["select", "input_select"];
@@ -47,8 +48,42 @@ const TV_TRANSPORTS = [
   ["atv", "Android TV Remote (direct)"],
   ["controlfreak", "Control Freak (MQTT)"],
   ["bluetooth", "Bluetooth"],
+  ["ir", "IR (point at the TV)"],
 ];
 const BLUETOOTH_WARNING = "Bluetooth slows the remote's Wi-Fi while connected.";
+const IR_HINT = "IR is line-of-sight: the remote has to point at the TV (or device).";
+
+// tv.wake_via: how Auto wakes a sleeping TV. Absent = bluetooth.
+const TV_WAKE_VIA = [
+  ["bluetooth", "Bluetooth"],
+  ["ir", "IR (power code, only when the TV is off)"],
+  ["none", "Don't wake"],
+];
+
+// ir action (NEC extended); the Hisense codes come from the tv_keys websocket (ir_codes).
+const IR_TV_ADDRESS = "0xBF00";
+const IR_MODES = [
+  ["tv", "TV key"],
+  ["custom", "Custom"],
+];
+const IR_FORMATS = [
+  ["nec", "NEC (address / command)"],
+  ["raw", "Raw (carrier + pattern)"],
+];
+const IR_HOLD_MODES = [
+  ["repeat", "Repeat while held"],
+  ["none", "None (ignore hold)"],
+];
+const hexNum = (v) => {
+  const s = String(v ?? "").trim();
+  if (/^0x[0-9a-f]+$/i.test(s)) return parseInt(s, 16);
+  if (/^\d+$/.test(s)) return Number(s);
+  return typeof v === "number" ? v : NaN;
+};
+const hexStr = (v, digits) => {
+  const n = hexNum(v);
+  return Number.isInteger(n) ? `0x${n.toString(16).toUpperCase().padStart(digits, "0")}` : String(v ?? "");
+};
 
 const APP_CMDS = [
   ["settings", "Open settings"],
@@ -228,6 +263,7 @@ class AstrionRemotePanel extends HTMLElement {
     this._saved = null;
     this._keys = [];
     this._tvKeys = [];
+    this._irCodes = [];
     this._contexts = [];
     this._status = "loading";
     this._message = "";
@@ -332,6 +368,7 @@ class AstrionRemotePanel extends HTMLElement {
       this._warnings = arr(data?.warnings);
       this._stale = false;
       this._tvKeys = arr(tv?.keys).map(String);
+      this._irCodes = arr(tv?.ir_codes).filter(isObj);
       this._errors = [];
       this._yamlPending = undefined;
       this._status = "ready";
@@ -552,6 +589,15 @@ class AstrionRemotePanel extends HTMLElement {
         return `App: ${action.cmd || ""}`;
       case "voice":
         return action.target === "tv" ? "Voice: TV Assistant" : "Voice: HA Assist";
+      case "ir": {
+        if ("carrier" in action || "pattern" in action) {
+          const khz = Number(action.carrier) / 1000;
+          return Number.isFinite(khz) && khz > 0 ? `IR · raw ${khz} kHz` : "IR · raw";
+        }
+        const tvKey = this._irTvName(action);
+        if (tvKey) return `IR · TV ${tvKey}`;
+        return `IR · NEC ${hexStr(action.address, 4)}/${hexStr(action.command, 2)}`;
+      }
       case "choose": {
         if (!action.entity) return "Choose from list";
         const friendly = this._hass?.states?.[action.entity]?.attributes?.friendly_name || action.entity.split(".").pop();
@@ -560,6 +606,14 @@ class AstrionRemotePanel extends HTMLElement {
       default:
         return String(action.type || "?");
     }
+  }
+
+  /** Name of the Hisense code an NEC ir action sends, or "" if it is not one of them. */
+  _irTvName(action) {
+    if (!isObj(action) || hexNum(action.address) !== hexNum(IR_TV_ADDRESS)) return "";
+    const cmd = hexNum(action.command);
+    const code = this._irCodes.find((c) => hexNum(c.address) === hexNum(IR_TV_ADDRESS) && hexNum(c.command) === cmd);
+    return code ? String(code.name) : "";
   }
 
   _errorsAt(prefix) {
@@ -744,6 +798,7 @@ class AstrionRemotePanel extends HTMLElement {
    */
   _actionEditor(get, set, { gesture = "tap", allowUnset = true, decorated = false, hint = true, voice = false } = {}) {
     const box = h("div", { class: "action" });
+    let irMode; // "tv" | "custom", kept across redraws so Custom can hold a Hisense code too
     const draw = () => {
       const cur = get();
       const type = isObj(cur) ? cur.type : "";
@@ -770,6 +825,12 @@ class AstrionRemotePanel extends HTMLElement {
             else if (v === "ha") next.action = "";
             else if (v === "voice") next.target = "ha";
             else if (v === "choose") next.entity = "";
+            else if (v === "ir") {
+              const first = this._irCodes[0];
+              Object.assign(next, { protocol: "nec", address: IR_TV_ADDRESS, command: first ? hexStr(first.command, 2) : "0x0D" });
+              if (gesture === "hold") next.hold = "repeat";
+              irMode = "tv";
+            }
             set(next);
           }
           draw();
@@ -846,6 +907,9 @@ class AstrionRemotePanel extends HTMLElement {
         if (hint) {
           fields.push(h("div", { class: "hint" }, "Opens a list of the entity's options on the remote; picking one selects it."));
         }
+      } else if (type === "ir") {
+        fields.push(...this._irFields(cur, get, set, patch, gesture, () => irMode, (m) => (irMode = m), draw));
+        if (hint) fields.push(h("div", { class: "hint" }, IR_HINT));
       } else if (type === "voice") {
         fields.push(this._select(VOICE_TARGETS, cur.target ?? "ha", (v) => {
             patch({ target: v || "ha" });
@@ -1616,11 +1680,99 @@ class AstrionRemotePanel extends HTMLElement {
     );
   }
 
+  /** Fields of an ir action: "TV key" (Hisense code picker) or "Custom" (NEC, or raw carrier + pattern). */
+  _irFields(cur, get, set, patch, gesture, getMode, setMode, draw) {
+    const raw = "carrier" in cur || "pattern" in cur;
+    let mode = getMode();
+    if (!mode) mode = !raw && this._irTvName(cur) ? "tv" : "custom";
+    setMode(mode);
+    // Rebuild the action keeping type, label/icon and (for NEC) hold.
+    const rebuild = (fields, keepHold) => {
+      const old = get() || {};
+      const next = { type: "ir" };
+      for (const f of ["label", "icon"]) if (f in old) next[f] = old[f];
+      Object.assign(next, fields);
+      if (keepHold) {
+        if ("hold" in old) next.hold = old.hold;
+        else if (gesture === "hold") next.hold = "repeat";
+      }
+      set(next);
+    };
+    const out = [];
+    out.push(
+      this._select(IR_MODES, mode, (v) => {
+        if (!v || v === getMode()) return;
+        setMode(v);
+        if (v === "tv") {
+          const c = get() || {};
+          const keep = !("carrier" in c || "pattern" in c) && this._irTvName(c);
+          const first = this._irCodes[0];
+          rebuild(
+            { protocol: "nec", address: IR_TV_ADDRESS, command: keep ? hexStr(c.command, 2) : first ? hexStr(first.command, 2) : "0x0D" },
+            true
+          );
+        }
+        draw();
+      }, { label: "IR code" })
+    );
+    if (mode === "tv") {
+      const codes = this._irCodes.map((c) => [hexStr(c.command, 2), String(c.name)]);
+      out.push(
+        this._select(codes, hexStr(cur.command, 2), (v) => {
+          if (!v) return;
+          patch({ protocol: "nec", address: IR_TV_ADDRESS, command: v });
+        }, { label: "TV key", helper: `Hisense, NEC extended ${IR_TV_ADDRESS}, 38 kHz` })
+      );
+    } else {
+      out.push(
+        this._select(IR_FORMATS, raw ? "raw" : "nec", (v) => {
+          if (!v || v === (raw ? "raw" : "nec")) return;
+          if (v === "raw") rebuild({ carrier: 38000, pattern: [] }, false);
+          else rebuild({ protocol: "nec", address: IR_TV_ADDRESS, command: "0x00" }, true);
+          draw();
+        }, { label: "Format" })
+      );
+      if (raw) {
+        out.push(
+          this._sel({ number: { min: 30000, max: 60000, step: 1, mode: "box", unit_of_measurement: "Hz" } }, cur.carrier ?? 38000, (v) =>
+            patch({ carrier: Number(v) })
+          , { label: "Carrier (Hz)", helper: "The HA100 supports 30, 33, 36, 38, 40 and 56 kHz" })
+        );
+        out.push(
+          this._sel({ text: { multiline: true } }, arr(cur.pattern).join(", "), (v) => {
+            const tokens = String(v ?? "").split(/[\s,]+/).filter(Boolean);
+            patch({ pattern: tokens.map((t) => (/^\d+$/.test(t) ? Number(t) : t)) });
+          }, { label: "Pattern (µs, mark, space, mark, …)", helper: "Comma or space separated; 2 s total at most" })
+        );
+      } else {
+        const num = (v) => {
+          const s = String(v ?? "").trim();
+          return /^\d+$/.test(s) ? Number(s) : s;
+        };
+        out.push(this._text(hexStr(cur.address, 4), (v) => patch({ protocol: "nec", address: num(v) }), "Address (e.g. 0xBF00)"));
+        out.push(this._text(hexStr(cur.command, 2), (v) => patch({ protocol: "nec", command: num(v) }), "Command (e.g. 0x0D)"));
+      }
+    }
+    if (!raw && gesture === "hold") {
+      out.push(this._select(IR_HOLD_MODES, cur.hold ?? "repeat", (v) => patch({ hold: v || undefined }), { label: "Hold mode" }));
+    }
+    return out;
+  }
+
   // ---- YAML tab ----------------------------------------------------------------------------
   // ---- Remote settings (YAML tab) ---------------------------------------------------------
   _renderRemoteSettings() {
     const current = this._config?.tv?.transport ?? "auto";
     const warn = h("div", { class: "hint warn", hidden: current !== "bluetooth" }, BLUETOOTH_WARNING);
+    const irHint = h("div", { class: "hint", hidden: current !== "ir" }, IR_HINT);
+    const setTv = (field, value, unset) => {
+      const tv = { ...(this._config.tv || {}) };
+      if (!value || value === unset) delete tv[field];
+      else tv[field] = value;
+      this._config = { ...this._config, tv };
+      this._touched();
+      if (this._yamlPending === undefined) this._renderYaml(); // keep the YAML view in step
+    };
     return this._card("Remote", [
       h(
         "p",
@@ -1628,15 +1780,16 @@ class AstrionRemotePanel extends HTMLElement {
         "Key route: how TV keys reach the TV. The remote's own Settings → Key route overrides this; motion settings (wake on pickup, sleep when put down) are set on the remote."
       ),
       this._select(TV_TRANSPORTS, current, (v) => {
-        const tv = { ...(this._config.tv || {}) };
-        if (!v || v === "auto") delete tv.transport;
-        else tv.transport = v;
-        this._config = { ...this._config, tv };
         warn.hidden = v !== "bluetooth";
-        this._touched();
-        if (this._yamlPending === undefined) this._renderYaml(); // keep the YAML view in step
+        irHint.hidden = v !== "ir";
+        setTv("transport", v, "auto");
       }, { label: "Key route" }),
       warn,
+      irHint,
+      this._select(TV_WAKE_VIA, this._config?.tv?.wake_via ?? "bluetooth", (v) => setTv("wake_via", v, "bluetooth"), {
+        label: "Wake TV via",
+        helper: "How Auto wakes a sleeping TV. IR sends the power code only when the TV's power entity says off.",
+      }),
     ]);
   }
 

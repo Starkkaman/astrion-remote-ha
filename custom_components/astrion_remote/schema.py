@@ -16,11 +16,17 @@ import voluptuous as vol
 from .const import (
     APP_CMDS,
     GESTURES,
+    IR_CARRIER_MAX,
+    IR_CARRIER_MIN,
+    IR_HOLD_MODES,
+    IR_PATTERN_MAX_US,
+    IR_PROTOCOLS,
     KEY_IDS,
     SCHEMA_VERSION,
     THEME_MODES,
     TV_HOLD_MODES,
     TV_TRANSPORTS,
+    TV_WAKE_VIA,
     VOICE_TARGETS,
 )
 
@@ -98,6 +104,72 @@ def _ha_data_check(action: dict[str, Any]) -> dict[str, Any]:
     return action
 
 
+_HEX_RE = re.compile(r"^0[xX][0-9a-fA-F]+$")
+
+
+def _ir_number(value: Any, field: str, maximum: int, digits: int) -> str:
+    """An int or "0x.." hex string in 0..maximum, normalised to an upper-case hex string ("0xBF00")."""
+    if isinstance(value, bool):
+        raise vol.Invalid(f"ir {field} must be an integer or a hex string like 0x{maximum:X}, not a boolean")
+    if isinstance(value, int):
+        num = value
+    elif isinstance(value, str) and _HEX_RE.match(value.strip()):
+        num = int(value.strip(), 16)
+    else:
+        raise vol.Invalid(f"ir {field} must be an integer or a hex string like 0x{maximum:X}, got {value!r}")
+    if not 0 <= num <= maximum:
+        raise vol.Invalid(f"ir {field} {value!r} is out of range 0x{0:0{digits}X}..0x{maximum:X}")
+    return f"0x{num:0{digits}X}"
+
+
+def _ir_pattern(value: Any) -> list[int]:
+    if not isinstance(value, list) or not value:
+        raise vol.Invalid("ir pattern must be a non-empty list of mark/space durations in µs")
+    for i, item in enumerate(value):
+        if isinstance(item, bool) or not isinstance(item, int) or item <= 0:
+            raise vol.Invalid(f"ir pattern[{i}] must be a positive integer (µs), got {item!r}")
+    total = sum(value)
+    if total > IR_PATTERN_MAX_US:
+        raise vol.Invalid(f"ir pattern is {total} µs long; the remote refuses patterns over {IR_PATTERN_MAX_US} µs (2 s)")
+    return list(value)
+
+
+def _ir_carrier(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise vol.Invalid(f"ir carrier must be an integer frequency in Hz (e.g. 38000), got {value!r}")
+    if not IR_CARRIER_MIN <= value <= IR_CARRIER_MAX:
+        raise vol.Invalid(f"ir carrier {value} Hz is out of range {IR_CARRIER_MIN}..{IR_CARRIER_MAX}")
+    return value
+
+
+_IR_NEC_FIELDS = {
+    vol.Required("protocol"): vol.All(
+        vol.Lower, vol.In(IR_PROTOCOLS, msg=f"ir protocol must be one of {', '.join(IR_PROTOCOLS)}")
+    ),
+    vol.Required("address"): lambda v: _ir_number(v, "address", 0xFFFF, 4),
+    vol.Required("command"): lambda v: _ir_number(v, "command", 0xFF, 2),
+    vol.Optional("hold"): vol.In(IR_HOLD_MODES, msg=f"ir hold must be one of {', '.join(IR_HOLD_MODES)}"),
+}
+_IR_RAW_FIELDS = {vol.Required("carrier"): _ir_carrier, vol.Required("pattern"): _ir_pattern}
+
+
+def _make_ir_validator(decorated: bool):
+    extra = _DECORATION if decorated else {}
+    nec = vol.Schema({vol.Required("type"): "ir", **_IR_NEC_FIELDS, **extra})
+    raw = vol.Schema({vol.Required("type"): "ir", **_IR_RAW_FIELDS, **extra})
+
+    def validate(value: dict[str, Any]) -> dict[str, Any]:
+        is_nec = any(k in value for k in ("protocol", "address", "command", "hold"))
+        is_raw = any(k in value for k in ("carrier", "pattern"))
+        if is_nec and is_raw:
+            raise vol.Invalid("ir action is either protocol/address/command or carrier/pattern, not both")
+        if not is_nec and not is_raw:
+            raise vol.Invalid('ir action needs protocol: "nec" with address and command, or carrier and pattern')
+        return (nec if is_nec else raw)(value)
+
+    return validate
+
+
 def _make_action_validator(decorated: bool):
     schemas = {
         typ: vol.Schema(
@@ -105,6 +177,8 @@ def _make_action_validator(decorated: bool):
         )
         for typ, fields in _ACTION_SCHEMAS.items()
     }
+    # ir has two shapes (NEC or raw carrier + pattern), so it gets its own validator.
+    schemas["ir"] = _make_ir_validator(decorated)
 
     def validate(value: Any) -> dict[str, Any]:
         if not isinstance(value, dict):
@@ -268,6 +342,8 @@ TV_SCHEMA = vol.Schema(
         vol.Optional("power_entity"): vol.Any(None, entity_id),
         # No default: an absent transport means auto, and stored configs stay unchanged.
         vol.Optional("transport"): vol.In(TV_TRANSPORTS),
+        # How Auto wakes a sleeping TV. No default: absent = bluetooth in the app.
+        vol.Optional("wake_via"): vol.In(TV_WAKE_VIA, msg=f"wake_via must be one of {', '.join(TV_WAKE_VIA)}"),
     }
 )
 THEME_SCHEMA = vol.Schema(

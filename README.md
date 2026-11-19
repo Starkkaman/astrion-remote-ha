@@ -43,8 +43,20 @@ part of the config.
 
 ## Key route (`tv.transport`)
 `tv.transport`: `auto` (default; absent = auto) | `atv` (Android TV Remote, direct) | `controlfreak` (MQTT) |
-`bluetooth`. Apps that do not know a value use `auto`; the remote's own Settings → Key route overrides it.
-Bluetooth slows the remote's Wi-Fi while connected.
+`bluetooth` | `ir` (the remote's IR blaster; NEC extended, address `0xBF00`, 38 kHz; line-of-sight). Apps that do
+not know a value use `auto`; the remote's own Settings → Key route overrides it. Bluetooth slows the remote's
+Wi-Fi while connected.
+
+`tv.wake_via`: `bluetooth` (default; absent = bluetooth) | `ir` | `none`: how Auto wakes a sleeping TV. The IR
+power code toggles, so the app sends it only when `tv.power_entity` says off.
+
+## IR action
+Any key can send an IR code (line-of-sight: point the remote at the device):
+- `{"type": "ir", "protocol": "nec", "address": "0xBF00", "command": "0x0D", "hold": "repeat"}`: NEC extended.
+  `address` 0..0xFFFF and `command` 0..0xFF as an integer or `0x` hex string, stored as upper-case hex
+  (`"0xBF00"`, `"0x0D"`); `hold` (optional) is `repeat` | `none`.
+- `{"type": "ir", "carrier": 38000, "pattern": [9000, 4500, ...]}`: raw. `carrier` 30000..60000 Hz; `pattern` is a
+  non-empty list of positive mark/space durations in µs, at most 2,000,000 µs in total.
 
 ## Allowlist
 Computed on every publish, never stored:
@@ -56,9 +68,10 @@ Computed on every publish, never stored:
 ## Editor panel (sidebar "Astrion Remote", admins only)
 - **Buttons**: the remote drawn as a grid of key chips (top row, voice, D-pad, menu, page, volume, colour keys,
   shortcut keys), each showing its tap action. Click a chip to set Tap / Double tap / Hold (TV key, Home Assistant
-  action, go to page, event only, nothing, app command) and per-app overrides for values of `tv.context_entity`.
+  action, go to page, event only, nothing, app command, IR code: a Hisense TV key or a custom NEC / raw code) and per-app overrides for values of `tv.context_entity`.
 - **Pages**: add, rename, reorder and delete pages; add/reorder/delete sections and edit them per type.
-- **YAML**: a **Remote** card (Key route = `tv.transport`, with the Bluetooth Wi-Fi warning) and the whole config
+- **YAML**: a **Remote** card (Key route = `tv.transport`, with the Bluetooth Wi-Fi warning; Wake TV via =
+  `tv.wake_via`) and the whole config
   for import/export.
 - Changes are validated live; **Save** validates, stores in the entry options and republishes (same path as the
   options flow). The panel works even while MQTT is down; the config is published once the remote is set up.
@@ -75,7 +88,7 @@ All commands are admin-only. `entry_id` is the Astrion Remote config entry; unkn
 | `astrion_remote/config/set` | `entry_id`, `config`, optional `version` | `config` (as stored, normalised), `version` |
 | `astrion_remote/config/reset` | `entry_id`, `parts` (any of `pages`, `keys`, `timings`, `theme`; default `["pages"]`) | `config`, `version`, `can_undo` |
 | `astrion_remote/config/undo_reset` | `entry_id` | `config`, `version`, `can_undo` |
-| `astrion_remote/tv_keys` | | `keys` (TV key names for pickers) |
+| `astrion_remote/tv_keys` | | `keys` (TV key names for pickers), `ir_codes` (Hisense IR codes: list of `{name, protocol: "nec", address: "0xBF00", command: "0x0D"}`, usable as an `ir` action as is) |
 
 **Version / optimistic concurrency.** `version` is the first 16 hex digits of the sha256 of the stored config's
 canonical JSON (keys sorted, no whitespace); the same content always has the same version. Send the `version` you

@@ -5,7 +5,7 @@ import json
 
 from homeassistant.components.frontend import DATA_PANELS
 
-from custom_components.astrion_remote.const import CONF_CONFIG, KEY_IDS, TV_KEYS
+from custom_components.astrion_remote.const import CONF_CONFIG, HISENSE_IR, KEY_IDS, TV_KEYS
 
 from .conftest import BASE
 
@@ -165,6 +165,10 @@ async def test_tv_keys(hass, mqtt_mock, setup_entry, hass_ws_client):
     msg = await _send(client, {"type": "astrion_remote/tv_keys"})
     assert msg["result"]["keys"] == list(TV_KEYS)
     assert "DPAD_CENTER" in TV_KEYS and "MEDIA_AUDIO_TRACK" in TV_KEYS
+    codes = msg["result"]["ir_codes"]
+    assert len(codes) == len(HISENSE_IR)
+    assert codes[0] == {"name": "Power", "protocol": "nec", "address": "0xBF00", "command": "0x0D"}
+    assert {"name": "OK", "protocol": "nec", "address": "0xBF00", "command": "0x15"} in codes
 
 
 async def test_panel_registered_and_removed(hass, mqtt_mock, setup_entry, hass_client):

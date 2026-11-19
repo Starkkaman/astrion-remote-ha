@@ -62,7 +62,9 @@ EVENT_CONFIG_CHANGED: Final = "astrion_remote_config_changed"
 EVENT_MOTION: Final = "astrion_remote_motion"
 MOTION_STATES: Final = ("picked_up", "put_down")
 # tv.transport: how tv_key actions reach the TV. Apps that do not know a value fall back to auto.
-TV_TRANSPORTS: Final = ("auto", "atv", "controlfreak", "bluetooth")
+TV_TRANSPORTS: Final = ("auto", "atv", "controlfreak", "bluetooth", "ir")
+# tv.wake_via: how Auto wakes a sleeping TV. Absent = bluetooth (the app default).
+TV_WAKE_VIA: Final = ("bluetooth", "ir", "none")
 # Telemetry `kiosk` values.
 KIOSK_STATES: Final = ("on", "off", "paused")
 
@@ -171,6 +173,48 @@ TV_KEYS: Final = (
     "INFO",
 )
 
+# Hisense (Phoster) IR codes, NEC extended, address 0xBF00, 38 kHz (astrion-remote docs/ir.md).
+# Name -> command. Vendor shortcut keys and 0x1A (sleep) are left out on purpose.
+HISENSE_IR_ADDRESS: Final = 0xBF00
+HISENSE_IR: Final = (
+    ("Power", 0x0D),
+    ("Power (alt)", 0xD1),
+    ("Up", 0x16),
+    ("Down", 0x17),
+    ("Left", 0x19),
+    ("Right", 0x18),
+    ("OK", 0x15),
+    ("Back", 0x48),
+    ("Home", 0x94),
+    ("Menu", 0x14),
+    ("Settings", 0x0F),
+    ("Volume up", 0x44),
+    ("Volume down", 0x43),
+    ("Mute", 0x0E),
+    ("Play/Pause", 0x4E),
+    ("Channel up", 0x4A),
+    ("Channel down", 0x4B),
+    ("Input", 0x12),
+    *((str(n), n) for n in range(10)),
+    ("Info", 0x0C),
+    ("Rewind", 0x57),
+    ("Fast forward", 0x56),
+    ("Stop", 0x5A),
+    ("Record", 0x74),
+    ("Guide", 0x1D),
+    ("Subtitles", 0x1F),
+    ("Audio track", 0x1C),
+    ("All apps", 0x5F),
+    ("Live TV", 0x1B),
+    ("Exit", 0x32),
+    ("Search", 0xD5),
+    ("Red", 0x52),
+    ("Green", 0x53),
+    ("Yellow", 0x54),
+    ("Blue", 0x55),
+    ("Teletext", 0x45),
+)
+
 # Sidebar panel.
 PANEL_URL_PATH: Final = "astrion-remote"
 PANEL_TITLE: Final = "Astrion Remote"
@@ -191,6 +235,12 @@ SECTION_TYPES: Final = (
     "keys",
 )
 TV_HOLD_MODES: Final = ("passthrough", "repeat", "none")
+IR_HOLD_MODES: Final = ("repeat", "none")
+IR_PROTOCOLS: Final = ("nec",)
+# ConsumerIrManager: discrete HA100 carriers lie in 30-56 kHz; a pattern over 2 s is refused.
+IR_CARRIER_MIN: Final = 30000
+IR_CARRIER_MAX: Final = 60000
+IR_PATTERN_MAX_US: Final = 2_000_000
 APP_CMDS: Final = ("settings", "reload")
 THEME_MODES: Final = ("auto", "day", "night")
 
